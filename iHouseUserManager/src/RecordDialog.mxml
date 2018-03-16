@@ -38,6 +38,7 @@
 				mAccountTypeGroup.addItemAt({accountType:"企业用户" , accountTypeValue:0,authority:"1"},0);
 				mAccountTypeGroup.addItemAt({accountType:"设计师"   , accountTypeValue:1,authority:"0"},1);
 				mAccountTypeGroup.addItemAt({accountType:"普通用户" , accountTypeValue:2,authority:"0"},2);
+				mAccountTypeGroup.addItemAt({accountType:"建材商" , accountTypeValue:3,authority:"0"},3);
 				//{accountType:"超级管理员"  , accountTypeValue:11,authority:"1"});
 
 				mAccountType.dataProvider = mAccountTypeGroup;
@@ -187,7 +188,7 @@
 				var index:int = mCombo.selectedIndex;
 				var strNewCompanyID:String = mCompanyGroup[index].CompanyID;
 					
-				//帐号类型:0 企业  1：设计师  2：普通用户
+				//帐号类型:0 企业  1：设计师  2：普通用户 3：建材商
 				var accountType:int = mAccountTypeObj.accountTypeValue;
 				
 				//帐号权限： 0：不能删除相关操作 1：可以操作
@@ -237,7 +238,7 @@
 				var index:int = mCombo.selectedIndex;
 				var strCompanyID:String = mCompanyGroup[index].CompanyID;
 				
-				//帐号类型:0 企业  1：设计师  2：普通用户
+				//帐号类型:0 企业  1：设计师  2：普通用户  3：建材商
 				var accountType:int = mAccountTypeObj.accountTypeValue;
 				
 				//帐号权限： 0：不能删除相关操作 1：可以操作
@@ -303,7 +304,7 @@
 					var index:int = mCombo.selectedIndex;
 					var strCompanyID:String = mCompanyGroup[index].CompanyID;
 					
-					//帐号类型:0 企业  1：设计师  2：普通用户
+					//帐号类型:0 企业  1：设计师  2：普通用户 3：建材商
 					var accountType:int = mAccountTypeObj.accountTypeValue;
 					
 					//帐号权限： 0：不能删除相关操作 1：可以操作

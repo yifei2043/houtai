@@ -99,6 +99,8 @@
 						strAccountType = "设计师";
 					else if("2" == strRecordArray[11])
 						strAccountType = "普通用户";
+					else if("3" == strRecordArray[11])
+						strAccountType = "建材商";
 					else if("11" == strRecordArray[11])
 						strAccountType = "超级管理员";
 						

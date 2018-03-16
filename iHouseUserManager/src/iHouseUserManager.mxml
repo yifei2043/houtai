@@ -23,7 +23,7 @@
 			//共享数据目录,默认使用浩思云科技
 			public var mStrFolder:String = "chenx";
 			
-			//帐号类型:0 企业  1：设计师  2：普通用户
+			//帐号类型:0 企业  1：设计师  2：普通用户 3：建材商
 			public var mStrAccountType:String = "0";
 			
 			public var mDataProcess:UserDataProcess = null;

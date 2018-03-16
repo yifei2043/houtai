@@ -56,7 +56,7 @@
 			//公司ID
 			public var m_strCompanyID:String;
 			
-			//帐号类型:0 企业  1：设计师  2：普通用户
+			//帐号类型:0 企业  1：设计师  2：普通用户 3：建材商
 			public var m_StrAccountType:String = "0";
 			
 			//插件名称对应RadioButton相关信息
