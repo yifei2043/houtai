@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:s="library://ns.adobe.com/flex/spark"
+				xmlns:fx="http://ns.adobe.com/mxml/2009"
+				xmlns:d="http://ns.adobe.com/fxg/2008/dt"
+				width="150" height="150">
+	<fx:Script>
+		<![CDATA[
+
+
+
+		]]>
+		
+	</fx:Script>
+	<s:Image left="5" top="5" right="5" bottom="5"  horizontalCenter="0"
+			 scaleMode="stretch" smooth="true" source="{data.thumbnailImage}"/>
+
+</s:ItemRenderer>

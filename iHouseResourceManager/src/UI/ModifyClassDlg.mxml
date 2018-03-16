@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="300" height="60" >
+	
+	<fx:Script>
+		<![CDATA[	
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.managers.PopUpManager;
+
+			public var m_iHouse:iHouseResourceManager;
+			
+			public var mStrClass1:String;
+			public var mStrClass2:String;
+			public var mStrClass3:String;
+			
+			public var mModifyModel:Boolean = false;
+
+			public function OnCancel():void
+			{
+				this.visible = false;
+			}
+			
+			public function ModifyModelClass(strClass1:String,strClass2:String,
+											  strClass3:String,strSelectNodeName:String):void
+			{
+			   mModifyModel = true;
+				
+               mStrClass1 = strClass1;
+			   mStrClass2 = strClass2;
+			   mStrClass3 = strClass3;
+			   
+			   mText.text = strSelectNodeName;
+			   
+			   visible = true;
+			}
+			
+			public function ModifyTextureClass(strClass1:String,strClass2:String,strSelectNodeName:String):void
+			{
+				mModifyModel = false;
+				
+				mStrClass1 = strClass1;
+				mStrClass2 = strClass2;
+				
+				mText.text = strSelectNodeName;
+				visible = true;
+			}
+			
+			public function OnModify():void
+			{
+				if("" == Trim(mText.text))
+				{
+					m_iHouse.mAlertDialog.show("输入新的分类名称");
+					mText.setFocus();
+					return ;
+				}
+				
+				if(mModifyModel)
+				{
+					m_iHouse.mDataView.OnModifyClass(mStrClass1,mStrClass2,mStrClass3,mText.text)
+				}
+				else
+				{
+					m_iHouse.mDataMatView.OnModifyClass(mStrClass1,mStrClass2,mText.text)
+				}
+				
+				mStrClass1 = "";
+				mStrClass2 = "";
+				mStrClass3 = "";
+				
+				visible = false;
+			}
+			
+			public function LTrim(s : String):String 
+			{ 
+				var i : Number = 0;
+				while(s.charCodeAt(i) == 32 || s.charCodeAt(i) == 13 || s.charCodeAt(i) == 10 || s.charCodeAt(i) == 9) 
+				{ 
+					i++;
+				} 
+				return s.substring(i,s.length);
+			}
+			
+			public function RTrim(s : String):String 
+			{ 
+				var i : Number = s.length - 1;
+				while(s.charCodeAt(i) == 32 || s.charCodeAt(i) == 13 || s.charCodeAt(i) == 10 ||s.charCodeAt(i) == 9) 
+				{ 
+					i--;
+				} 
+				return s.substring(0,i+1);
+			}
+			
+			public function Trim(s : String):String 
+			{ 
+				return LTrim(RTrim(s));
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<mx:Blur id="blurOn" blurXFrom="0.0" blurXTo="10.0" blurYFrom="0.0" blurYTo="10.0"/>
+		<mx:Blur id="blurOut" blurXFrom="10.0" blurXTo="0.0" blurYFrom="10.0" blurYTo="0.0"/>	
+	</fx:Declarations>	
+	<s:Rect left="8" top="10" right="10" bottom="8" radiusX="5" >
+		<s:fill>
+			<s:SolidColor alpha="1" color="#eeeeee" />		
+		</s:fill>
+		<s:stroke>
+			<s:SolidColorStroke alpha="1" caps="none" color="#888888" joints="miter" miterLimit="1" weight="1"/>
+		</s:stroke>
+		<s:filters>
+			<s:DropShadowFilter angle="0" blurX="8" blurY="8" color="#888888"
+								distance="0" hideObject="false" inner="false" knockout="false"
+								quality="2" strength="1"/>
+		</s:filters> 		
+	</s:Rect>
+	
+	<s:Rect right="0" top="0" width="20" height="20" radiusX="45">
+		<s:stroke>
+			<s:SolidColorStroke color="#ffffff" caps="none" weight="3" joints="miter" miterLimit="4"/>
+		</s:stroke>	
+		<s:fill>
+			<s:SolidColor color="#000000"/>
+		</s:fill>
+		<s:filters>
+			<s:DropShadowFilter angle="0" blurX="4" blurY="4" color="#888888"
+								distance="0" hideObject="false" inner="false" knockout="false"
+								quality="2" strength="1"/>
+		</s:filters> 	
+	</s:Rect>
+		
+	
+	<s:Image right="5" top="6"  source="@Embed('/assets/close.png')" scaleX="0.6" scaleY="0.6"
+			 mouseDownEffect="{blurOn}" mouseUpEffect="{blurOut}" smooth="true"
+			 buttonMode="true" click="this.visible = false;" />
+	
+	<s:Label id="mTitle" x="13" y="24" width="91" color="#141414" fontFamily="宋体" fontSize="15"
+			 text="修改分类:" textAlign="center"/>
+	<s:TextInput id="mText" x="107" y="20" width="119" height="23" editable="true" fontSize="15"/>
+	<s:Button right="22" bottom="16" width="44" height="26" label="确定" click="OnModify();"
+			  fontFamily="宋体" fontSize="15" skinClass="Skins.CommonButton"/>
+	<s:Group x="0" y="0" width="104" height="60" mouseDown="this.startDrag();" mouseUp="this.stopDrag()">
+	</s:Group>
+</s:Group>

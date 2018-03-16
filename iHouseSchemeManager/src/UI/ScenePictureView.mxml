@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 xmlns:local="*"
+		 width="780" height="450" >
+	
+	<fx:Script>
+		<![CDATA[				
+			import flash.display.StageScaleMode;
+			
+			import flashx.textLayout.elements.BreakElement;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.ListEvent;
+			import mx.events.ResizeEvent;
+			import mx.rpc.AbstractOperation;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			public var m_iHouse:iHouseSchemeManager;
+			
+			public var picProvider:ArrayCollection = new ArrayCollection();
+			
+			public function OnClose():void
+			{
+				this.visible = false;
+				picProvider.removeAll();
+			}
+			
+			public function SetPicData(strPicData:String,strScenePicPath:String):void
+			{
+				picProvider.removeAll();
+				
+				var picArr:Array = strPicData.split(",");
+				
+				for(var index:uint = 0; index < picArr.length; ++index)
+				{
+					var strHttpPic:String = m_iHouse.mDataProcess.webserviceAddr + picArr[index];
+					
+					picProvider.addItem({title:"", thumbnailImage:strHttpPic,handle:{httpPic:strHttpPic}, gParent:this});					
+				}
+				
+				if( picProvider.length > 0) 
+				{
+					totalCount = picProvider.length;
+					totalPage = (totalCount + pageCount -1)/pageCount;
+					setPager(0);  
+					inputpage.minimum=1; 
+					inputpage.maximum= totalPage; 
+				}
+				else
+				{
+					totalCount 	= 0;
+					totalPage 	= 0;
+					curPage 	= 0;
+					inputpage.minimum= 0;
+					inputpage.maximum= 0;
+					pagedetail.text = "第 0 页/共 0 页 共 0 条记录";  
+				}			
+			}
+			
+			//删除图片，从后台中的xml文件中去除，并没有真正删除图片文件
+			public var strHttpPic:String = "";
+			public function deleteScene(obj:Object):void
+			{
+				if(m_iHouse.mStrAdministrator == "1")
+				{
+					strHttpPic = obj.httpPic;
+					
+					m_iHouse.mYesNoDialog.mYes.label = "确定";  
+					m_iHouse.mYesNoDialog.mNo.label  = "取消";
+					m_iHouse.mYesNoDialog.show("是否删除",OnDelete_Yes,OnDelete_No);	
+				}
+				else
+				{
+					m_iHouse.mYesNoDialog.show("非管理员，禁止删除!",OnDelete_Yes,OnDelete_No);
+				}
+			}
+			
+			public function OnDelete_Yes():void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("DeleteScenePicture");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnErrorDel);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnDeletePicture);
+				
+				if(strHttpPic !="")
+				{
+					op.send(strHttpPic);
+			    }
+			}
+			
+			public function OnDelete_No():void
+			{			
+			}  
+			
+			private function OnErrorDel(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnErrorDel);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnDeletePicture);
+				m_iHouse.mHelpDialog.show("删除图片错误.");	 
+			}			
+			
+			//更新界面数据
+			public function OnRefreshScene():void
+			{	
+				for(var index:uint = 0; index < picProvider.length; ++index)
+				{
+					var obj:Object = picProvider[index];
+					
+					var strItemHttpPic:String = obj.handle.httpPic;
+					
+					if(strItemHttpPic == strHttpPic)
+					{
+						picProvider.removeItemAt(index);
+						break;
+					}					
+				}								
+			}
+			
+			public function OnDeletePicture(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnErrorDel);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnDeletePicture);
+				
+				if(e.result == "1")
+				{
+					m_iHouse.mHelpDialog.show("删除成功!");						
+					OnRefreshScene();
+				}
+				else
+				{
+					m_iHouse.mHelpDialog.show("删除失败,错误原因：" + e.result);	
+				}
+			} 
+			
+			public var curPage:int; 		// 当前页码
+			public var totalPage:int;  	// 总页数 
+			public var totalCount:int; 	// 总记录条数 
+			public var pageCount:int = 8;	// 每页包含的记录数，默认6条 
+			private var mypagedata:ArrayCollection = new ArrayCollection();
+			public function setPager(value:int):void              
+			{ 
+				if(value <0 || (value+1)>totalPage)
+				{                      
+					return;  
+				}                  
+				curPage = value;                  			    // 计算跳转到页面中的第一条记录所在记录中是第几条记录       
+				var curNum : int = value*pageCount;            // 清空当前显示的数据记录    
+				mypagedata.removeAll();                  
+				
+				for(var i:int = 0; curNum<picProvider.length&&i<pageCount; i++,curNum++)
+				{                      
+					mypagedata.addItem(picProvider.getItemAt(curNum));  
+				} 
+				
+				var temp:int=curPage+1;                  
+				pagedetail.text = "第 "+temp+" 页/共 "+totalPage+" 页 共 "+totalCount+" 条记录"; 
+				tileList.dataProvider = mypagedata;		
+			}  
+			
+/* 			protected function OnReSize(event:ResizeEvent):void
+			{
+				stage.scaleMode =  StageScaleMode.EXACT_FIT;
+			} */
+			
+		]]>
+	</fx:Script>	
+	<fx:Declarations>
+		<mx:Blur id="blurOn" blurXFrom="0.0" blurXTo="10.0" blurYFrom="0.0" blurYTo="10.0"/>
+		<mx:Blur id="blurOut" blurXFrom="10.0" blurXTo="0.0" blurYFrom="10.0" blurYTo="0.0"/>		
+	</fx:Declarations>
+	<s:Group left="0" right="0" top="0" bottom="0" mouseDown="this.startDrag();" mouseUp="this.stopDrag()">
+		<s:Rect right="20" top="20" left="10" bottom="8" radiusX="5">
+			<s:fill>
+				<s:SolidColor color="#ffffff"/>
+			</s:fill>		
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="8" blurY="8" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 		
+		</s:Rect>	
+		<s:Group right="35" top="65" width="350" color="#606060" fontFamily="宋体" fontSize="15"
+				 fontStyle="normal" fontWeight="normal">
+			<mx:LinkButton x="2"   y="0" label="首页" click="setPager(0);"/>
+			<mx:LinkButton x="57"  y="0" width="65" label="上一页" click="setPager(curPage - 1);"/>         
+			<mx:LinkButton x="122" y="0" width="65" label="下一页" click="setPager(curPage + 1);"/>         
+			<mx:LinkButton x="190" y="0" label="末页" click="setPager(totalPage - 1);"/>          
+			<mx:NumericStepper id="inputpage" x="240" y="0" height="22" maximum="0" minimum="0"
+							   stepSize="1" color="#000000"/>          
+			<mx:LinkButton x="292" y="1" label="跳转" click="setPager(inputpage.value - 1);"/>  
+		</s:Group>
+		<s:Label id="pagedetail" left="37" top="72" color="#606060" fontFamily="宋体" fontSize="15"
+				 fontStyle="normal" fontWeight="normal" text="第 0 页/共 0 页"/>
+		<s:Label x="23" y="34" fontFamily="宋体" fontSize="25" fontStyle="normal" fontWeight="bold"
+				 text="场景图片窗口"/>
+		<s:Rect right="10" top="6" width="35" height="35" radiusX="45">
+			<s:stroke>
+				<s:SolidColorStroke color="#ffffff" caps="none" weight="3" joints="miter" miterLimit="4"/>
+			</s:stroke>	
+			<s:fill>
+				<s:SolidColor color="#000000"/>
+			</s:fill>
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="4" blurY="4" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 	
+		</s:Rect>	
+		
+		<s:Image right="19" top="14"  source="@Embed('/assets/close.png')" 
+				 mouseDownEffect="{blurOn}" mouseUpEffect="{blurOut}"
+				 buttonMode="true" click="OnClose();" />
+	</s:Group>	
+	
+	<s:List  right="25" top="93" left="15" bottom="15" id="tileList" skinClass="Skins.HouseListSkin" dataProvider="{picProvider}" doubleClickEnabled="true"
+			 itemRenderer="Skins.MySpaceListItemRenderer"  />	
+</s:Group>

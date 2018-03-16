@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Skin xmlns:s="library://ns.adobe.com/flex/spark"
+		xmlns:fx="http://ns.adobe.com/mxml/2009"
+		width="22" height="22">
+	<fx:Metadata>[HostComponent("spark.components.Button")]</fx:Metadata>
+	<s:states>
+		<s:State name="up"/>
+		<s:State name="over"/>
+		<s:State name="down"/>
+		<s:State name="disabled"/>
+	</s:states>
+	<s:Ellipse x="0" y="0" width="22" height="22"
+			   alpha.down="0.5"
+			   alpha.up="0.5">
+		<s:fill>
+			<s:SolidColor alpha.disabled="1" color="#999999"
+						  alpha.down="0.5"
+						  alpha.over="1"
+						  alpha.up="0.5"/>
+		</s:fill>
+	</s:Ellipse>
+<!--	<s:Path x="3.3" y="3.95"
+			data="M 12.44 14.57 L 7.70 12.08 2.96 14.57 3.87 9.30 0.03 5.56 5.33 4.79 7.70 -0.01 10.07 4.79 15.37 5.56 11.53 9.30 Z "
+			alpha.down="0.5"
+			alpha.up="0.5">
+		<s:fill>
+			<s:SolidColor color="#FFFFFF"/>
+		</s:fill>
+	</s:Path>-->
+	<s:Label x="4" y="6" color="#ffffff" text="3D"
+			 fontFamily.up="宋体" fontWeight.up="bold"/>
+		
+</s:Skin>

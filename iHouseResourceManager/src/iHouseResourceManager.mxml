@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx" 
+			   minWidth="955" minHeight="600"
+			   xmlns:local="*" xmlns:UI="UI.*" 
+			   backgroundAlpha="0.0" creationComplete="Init();" >  
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.events.FlexEvent;
+			import mx.managers.SystemManager;
+			
+			public var mDataProcess:ResourceDataProcess = null;
+			
+			//用户ID，默认为帐号为zhouqj的id作测试
+			public var mStrUserID:String = "78";
+			
+			//是否为管理员  1:是管理员 0:非管理员
+			public var mStrAdministrator:String = "1";
+			
+			//登录时用户名
+			public var mUserName:String = "zhouqj";
+			
+			public var mStrCompanyID:String = "2";
+			
+			//共享数据目录,默认使用浩思云科技
+			public var mStrFolder:String = "chenx";
+			
+			//帐号类型:0 企业  1：设计师  2：普通用户
+			public var mStrAccountType:String = "0";
+			
+			public var mLoadFavoriteManager:Boolean = false;
+			
+			public function Init():void
+			{				
+				mDataProcess = new ResourceDataProcess(this);					
+				SetWindowPosition(1,1,1,1);
+			}
+			
+			public function SetLoginInfo(strUserID:String,StrAdministrator:String,
+										  UserName:String,StrCompanyID:String,
+										  StrFolder:String,StrAccountType:String):void
+			{
+				mStrUserID = strUserID;
+				mStrAdministrator = StrAdministrator;
+				mUserName = UserName;
+				mStrCompanyID = StrCompanyID;
+				mStrFolder = StrFolder;
+				mStrAccountType = StrAccountType;
+			}
+			
+			public function SetWindowPosition(nLeft:int,nTop:int,nRight:int,nBottom:int):void
+			{
+				mDataView.left = nLeft;
+				mDataView.top = nTop;
+				mDataView.right = nRight;
+				mDataView.bottom = nBottom;
+				
+				mDataMatView.left = nLeft;
+				mDataMatView.top = nTop;
+				mDataMatView.right = nRight;
+				mDataMatView.bottom = nBottom;
+				
+				mSWFA3DLoader.left = nLeft;
+				mSWFA3DLoader.top = nTop;
+				mSWFA3DLoader.right = nRight;
+				mSWFA3DLoader.bottom = nBottom;
+				
+				mSWFCollectLoader.left = nLeft;
+				mSWFCollectLoader.top = nTop;
+				mSWFCollectLoader.right = nRight;
+				mSWFCollectLoader.bottom = nBottom;
+			}
+			
+			//加载模型数据
+			public function LoadModelData():void
+			{
+				mDataView.init();  
+				mDataMatView.init();
+				
+				mDataView.UpdateDB();
+				
+				SetButtonState();
+			}
+			
+			public function ChangeTabView(iIndex:int):void
+			{
+				mDataView.visible 	 = false;
+				mDataMatView.visible = false; 
+
+				mSWFA3DLoader.visible = false;
+				
+				switch(iIndex)
+				{
+					case 1:
+						mSWFA3DLoader.visible = true;
+						break;
+
+					case 2:
+						mDataView.visible = true;
+						break;
+				} 
+			}
+			
+			
+			public function SetButtonState():void
+			{
+				mDataView.SetButtonState();
+				mDataMatView.SetButtonState();
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+
+	<UI:DataView id="mDataView" m_iHouse="{this}" left="1" right="1" top="50" bottom="0" visible="true"/>
+	<UI:DataMatView id="mDataMatView" 	m_iHouse="{this}" left="1" right="1" top="50" bottom="0" visible="false" />
+	
+	<s:SWFLoader id="mSWFA3DLoader" left="1" top ="50" right="1" bottom="1" visible="false"/>	
+	<s:SWFLoader id="mSWFCollectLoader" left="1" top ="50" right="1" bottom="1" visible="false"/>
+	
+	<local:UploadProductDlg   id="mUploadProductDlg" m_iHouse="{this}" horizontalCenter="0" verticalCenter="0"   visible="false"/>
+	<local:UploadProductBJDlg   id="mUploadProductBJDlg" m_iHouse="{this}" horizontalCenter="0" verticalCenter="0"   visible="false"/>
+	<local:ChangeModelClassDlg   id="mChangeModelClassDlg" m_iHouse="{this}" horizontalCenter="0" verticalCenter="0"   visible="false"/>
+	<local:ChangeMaterialClassDlg   id="mChangeMaterialClassDlg" m_iHouse="{this}" horizontalCenter="0" verticalCenter="0"   visible="false"/>
+    <local:UploadModelDlg id="mUploadFileDlg" m_iHouse="{this}" x="{(this.width-mUploadFileDlg.width)/2}" y="{(this.height-mUploadFileDlg.height)/2-48}" visible="false"  />
+	
+	<UI:ResourceHelpDialog 	id="mHelpDialog"   m_iHouse="{this}" x="{(this.width-mHelpDialog.width)/2}" y="{(this.height-mHelpDialog.height)/2}" visible="false"  />
+	<UI:ResourceAlertDialog id="mAlertDialog"   m_iHouse="{this}" x="{(this.width-mAlertDialog.width)/2}" y="{(this.height-mAlertDialog.height)/2}" visible="false"  />
+	<UI:ResourceYesNoDialog id="mYesNoDialog"  m_iHouse="{this}" x="{(this.width-mYesNoDialog.width)/2}" y="{(this.height-mYesNoDialog.height)/2}" visible="false"  />
+
+</s:Application>

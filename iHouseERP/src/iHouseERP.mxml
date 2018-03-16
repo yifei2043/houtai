@@ -1,0 +1,523 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx" 
+			   xmlns:local="*" 
+			   xmlns:UI="UI.*" backgroundAlpha="0.0" 
+			   minWidth="640"  minHeight="480" creationComplete="Init();" >
+	<fx:Script>
+		<![CDATA[
+			import flash.errors.IOError;
+			import flash.events.Event;
+			import flash.events.IOErrorEvent;
+			import flash.net.*;
+			import flash.net.URLLoader;
+			
+			import flashx.textLayout.debug.assert;
+			import flashx.textLayout.elements.BreakElement;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.SWFLoader;
+			import mx.events.FlexEvent;
+			import mx.managers.DragManager;
+			import mx.managers.SystemManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.soap.LoadEvent;
+			import mx.skins.halo.TitleBackground;
+			
+			private var dragManager:DragManager;
+
+			public var m_webService:DataCore = null; 
+			
+			//服务地址
+			public var m_strHttp:String;
+			
+			//自动登录时用户名
+			public var m_userName:String="";
+			public var m_userPassword:String="<autologin6573>"; //自动登录给一固定密码
+			public var m_isLogin:String="";
+			public var m_bAutoLogin:Boolean = false;
+			public var m_bflag:Boolean = false;
+			
+			//用户ID，默认为帐号为zhouqj的id作测试
+			public var m_StrUserID:String = "78"; 
+			
+			//0:非管理员 帐号   1：管理员帐号
+			public var m_strAdministrator:String="0";
+			
+			//登录用户帐号
+			public var m_strSysUser:String;
+			
+			//保存登录帐号做的方案数据目录
+			public var m_strFolder:String;
+			
+			//公司ID
+			public var m_strCompanyID:String;
+			
+			//帐号类型:0 企业  1：设计师  2：普通用户
+			public var m_StrAccountType:String = "0";
+			
+			//插件名称对应RadioButton相关信息
+			public var m_dicPlugin:Dictionary = new Dictionary();
+			
+			//插件名称对应的RadioButton
+			public var m_dicRadioButton:Dictionary = new Dictionary();
+			
+			//插件名称对应加载插件控件
+			public var m_dicPluginSWF:Dictionary = new Dictionary();
+			
+			private var xmlLoader: URLLoader = new URLLoader();
+			public var mHoutaiName:String    =  "" ;  //登录时窗口标题
+			public var mHoutaiTitle:String   =  "" ;  //主窗口标题;
+			public var mChangeClass:String   =  "0";  //是否显示修改分类
+			public var mProductInfo:String   =  "0";  //是否显示产品信息修改项
+			public var mCompleteXML:String   = "-1";  //-1:初始状态  0:xml解析完成   1:没有找到setting.xml文件
+			public var mUseWebReport:String  = "0" ;  //0:不使用网页报表  1:使用网页报表 
+			  
+			public function Init():void
+			{	
+				LoadSettingXML(); 
+				
+				//字符对应相应按钮id
+				m_dicRadioButton["iHouseUserManager"]     = iHouseUserManager;
+				m_dicRadioButton["iHouseResourceManager"] = iHouseResourceManager;
+				m_dicRadioButton["iHouseShareManager"]    = iHouseShareManager;
+				m_dicRadioButton["iHouseSchemeManager"]   = iHouseSchemeManager;
+				//m_dicRadioButton["iHouseFavoriteManager"] = iHouseUserCollect;
+				m_dicRadioButton["iHouseTypeManager"]    	= iHouseTypeManager;
+			}
+			
+			private function IsAutoLogin():Boolean
+			{
+				//http://192.168.1.1/1.html?username=panny&isLogin=TRUE
+				var urlParameter:String = ExternalInterface.call("function getUrlParams(){return window.location.href;}");				
+				var index:int = urlParameter.indexOf("?");
+				
+				if(-1 != index)  
+				{
+					try
+					{  
+						urlParameter = urlParameter.substr(index+1);
+						var params:Array = urlParameter.split("&");
+						m_userName = params[0].split("=")[1];
+						m_isLogin= params[1].split("=")[1];
+					}
+					catch(err:Error)
+					{
+                       trace(err.toString());
+					}					
+				}
+				
+				if(m_userName !="" && "TRUE" == m_isLogin)
+					m_bAutoLogin = true;
+				
+				return m_bAutoLogin;
+			}
+			
+			//加载视频监控配置文件
+			private function LoadSettingXML():void
+			{
+				xmlLoader.addEventListener(Event.COMPLETE, CompleteXMLHandle);
+				xmlLoader.addEventListener(IOErrorEvent.IO_ERROR,LoadFailed);
+				
+				try
+				{
+					xmlLoader.load(new URLRequest("iHouse/setting.xml"));
+				} 
+				catch(error:Error) 
+				{
+					Alert.show(error.toString());
+				}			
+			}
+			
+			private function CompleteXMLHandle(e:Event):void
+			{
+				xmlLoader.removeEventListener(Event.COMPLETE, CompleteXMLHandle);
+				xmlLoader.removeEventListener(FaultEvent.FAULT,LoadFailed);
+				
+				if("" != e.target.data)
+					ParseSettingXML(e.target.data);
+				
+				this.addEventListener(KeyboardEvent.KEY_DOWN, onKeyDown);
+				this.addEventListener(MouseEvent.RIGHT_CLICK,	OnRightClick);
+			}
+			
+			public function ParseSettingXML(strXmlData:String):void
+			{
+				try
+				{
+					var settingXMlData:XML = XML(strXmlData);
+					
+					//基本信息
+					m_strHttp = settingXMlData.setting.webservice.@addr;				
+					mHoutaiName = settingXMlData.setting.houtai.@name;
+					mHoutaiTitle = settingXMlData.setting.houtai.@title;
+					mChangeClass = settingXMlData.setting.show.@classify;
+					mProductInfo = settingXMlData.setting.show.@productinfo;
+					mUseWebReport = settingXMlData.setting.show.@webreport;
+					
+					if(mHoutaiName != "")
+					{
+						mLoginDialog.mLoginTitle.text = mHoutaiName;
+					}
+					
+					if(mHoutaiTitle != "")
+					{
+						mTitleName.text = mHoutaiTitle;
+					}
+					
+					//插件数据
+					for each(var item:XML in settingXMlData.plugin.item)
+					{
+						var strPluginName:String = item.@name;
+						
+						m_dicPlugin[strPluginName] = { pluginName:item.@name + ".swf",
+								                       position:item.@position,
+								                       title:item.@title,
+													   titlewidth:item.@titlewidth,
+													   titletop:item.@titletop
+						                             };
+						
+						var swfLoader:SWFLoader = new SWFLoader(); 
+						this.addElement(swfLoader);
+						swfLoader.left =1;
+						swfLoader.top  = 40;
+						swfLoader.right = 1;
+						swfLoader.bottom = 1;
+						
+						swfLoader.visible = false;
+						
+						m_dicPluginSWF[strPluginName] = {pluginLoader:swfLoader,loaded:false,pluginHandle:null}; 
+					}
+					
+					LoadWebService();
+					
+				}
+				catch(error:Error)
+				{
+					Alert.show(error.message);
+				}
+				
+				//显示登录对话框
+				mLoginDialog.show();
+			}
+			
+			//初始化服务，并且根据输入的用户名密码做登录
+			public function LoadWebService():void
+			{
+				m_webService = new DataCore();        
+				m_webService.m_iHouse = this;         				
+				m_webService.InitDataCore();
+			}
+			
+			//判断字符串是否可以转换成Number
+			public function isNumber(str:String):Boolean
+			{
+				// 当string 为 null,空字符串,空白符时可转换为0
+				if(!str) 
+					return true;
+				
+				var n:Number = Number(str);
+				
+				// 过滤 NaN Infinity -Infinity
+				return !isNaN(n) && isFinite(n);
+			}
+			
+			//成功登录 
+			public function OnLoginSuccess():void
+			{
+				SetRadioButtonInfo();
+				
+				//默认显示用户管理
+				ChangeTabView(1);
+			}
+			
+			//设置按钮位置与显示信息
+			public function SetRadioButtonInfo():void
+			{
+				try
+				{
+					//插件数据
+					for(var plugName:String in m_dicPlugin)
+					{
+						//普通用户不加载收藏插件
+/* 						if(m_StrAccountType == "2" && "iHouseFavoriteManager" == plugName)
+						{
+							continue;
+						} */
+						
+						//只有超级管理员与企业用户可以查看帐号
+						/* if((m_StrAccountType != "11" || m_StrAccountType != "0") && "iHouseUserManager" == plugName)
+						{
+							continue;
+						} */
+						
+						if(m_dicRadioButton.hasOwnProperty(plugName))
+						{
+							var obj:Object = m_dicPlugin[plugName];
+							
+							var rdButton:RadioButton = m_dicRadioButton[plugName] as RadioButton;
+							rdButton.label = obj.title;
+							
+							var iPos:Number = isNumber(obj.position) ? Number(obj.position) : 1;
+							var titleWidth:Number = isNumber(obj.titlewidth) ? Number(obj.titlewidth) : 100; //默认宽度为100
+							rdButton.left = ((iPos - 1) * titleWidth)  + iPos;
+							
+							var titleTop:Number = isNumber(obj.titletop) ? Number(obj.titletop) : 1; //默认标题离顶高度为1
+							rdButton.top = titleTop;
+							
+							rdButton.visible = true;
+						}
+					}
+				} 
+				catch(error:Error) 
+				{
+					trace(error.message);
+				}
+			}
+			
+			public function LoadFailed(event:IOErrorEvent) :void
+			{
+				xmlLoader.removeEventListener(Event.COMPLETE, CompleteXMLHandle);
+				xmlLoader.removeEventListener(FaultEvent.FAULT,LoadFailed);
+				
+				//失败时使用默认http，这个数据写在调用网页中
+				m_strHttp = this.parameters.http;
+				
+				this.addEventListener(KeyboardEvent.KEY_DOWN, onKeyDown);
+				this.addEventListener(MouseEvent.RIGHT_CLICK,	OnRightClick);
+			}
+			
+			public function OnRightClick(e:MouseEvent):void
+			{	
+			} 
+			
+			public function onKeyDown(evt:KeyboardEvent):void
+			{
+				if( mLoginDialog.visible == true && evt.charCode == 13)
+				{
+					mLoginDialog.OnOK();
+					return;
+				}
+			}
+			
+			public function HideAllSWF():void
+			{
+				for(var name:String in m_dicPluginSWF)
+				{
+					m_dicPluginSWF[name].pluginLoader.visible = false;
+				}
+			}
+			
+			//根据索引取得插件名称
+			public function GetPluginName(iIndex:int):String
+			{
+				for(var strPlugName:String in m_dicPlugin)
+				{
+					var obj:Object = m_dicPlugin[strPlugName];
+					
+					if(obj.position == iIndex.toString())
+					{
+						return strPlugName;
+					}
+				}
+				
+				return "";
+			}
+			
+			//加载插件
+			public var mStrPluginName:String = "";
+			public function LoadPlugin(strPluginName:String):void
+			{
+				mStrPluginName = strPluginName;
+				
+				var times:Date = new Date;
+				
+				var obj:Object = m_dicPluginSWF[strPluginName];
+				obj.pluginLoader.addEventListener(Event.COMPLETE, LoadComplete);				
+				obj.pluginLoader.load("ihouse/" + strPluginName +".swf"+"?"+String(times.milliseconds));
+			}
+			
+			private var mObj:SystemManager;
+			private function LoadComplete(e:Event):void
+			{
+				var obj:Object = m_dicPluginSWF[mStrPluginName];
+				
+				obj.pluginLoader.removeEventListener(Event.COMPLETE, LoadComplete);
+				mObj = obj.pluginLoader.content as SystemManager;
+				
+				if( mObj == null )   
+					return;
+				
+				mObj.addEventListener(FlexEvent.APPLICATION_COMPLETE,ApplicationComplete); 
+			}
+			
+			private function ApplicationComplete(e:Event):void  
+			{ 
+				mObj.removeEventListener(FlexEvent.APPLICATION_COMPLETE,ApplicationComplete);		
+				
+				var pluginWnd:* = e.target.application;
+				
+				if(null != pluginWnd)
+				{
+					pluginWnd.SetLoginInfo(m_StrUserID,m_strAdministrator,m_strSysUser,
+						                   m_strCompanyID,m_strFolder,m_StrAccountType);
+	
+					//设置插件成功加载标志
+					var obj:Object = m_dicPluginSWF[mStrPluginName];
+					obj.loaded = true;
+					obj.pluginHandle = pluginWnd;
+				}
+			}
+
+			public function OnPluginUnload(e:Event):void
+			{
+
+			}
+			
+			public function ProcessFavorite(iIndex:int,obj:Object):void
+			{
+				//模型插件
+				if(2 == iIndex )
+				{
+					var objFavorite:Object = m_dicPluginSWF["iHouseFavoriteManager"];
+					
+					//如果收藏插件中有取消操作时
+					if(objFavorite.loaded && objFavorite.pluginHandle.HasModify())
+					{
+						obj.pluginHandle.OnLoadData();
+					}
+					
+					return;
+				}
+				
+				//收藏插件
+				if(5 == iIndex )
+				{
+					var objResource:Object = m_dicPluginSWF["iHouseResourceManager"];
+					
+					//如果收藏插件中有取消操作时
+					if(objResource.loaded && objResource.pluginHandle.HasModify())
+					{
+						obj.pluginHandle.OnLoadData();
+					}
+					
+					return;
+				}
+			}
+			
+			//显示相应功能
+			public function ChangeTabView(iIndex:int):void
+			{	
+				var strPlugName:String = GetPluginName(iIndex);
+				
+			    if(false == m_dicPluginSWF.hasOwnProperty(strPlugName))
+				   return;
+				
+				HideAllSWF();
+				
+				//显示按钮点击时对应的插件
+				var obj:Object = m_dicPluginSWF[strPlugName];
+				obj.pluginLoader.visible = true;
+
+				if(obj.loaded)
+				{
+					//如果有收藏插件时，判断是否需要重新加载收藏数据（模型插件、收藏插件 只要有数据更新，另外插件也需要更新）
+					//if(m_dicPlugin.hasOwnProperty("iHouseFavoriteManager"))
+					//   ProcessFavorite(iIndex,obj);
+					
+					return;
+				}
+				
+				switch(iIndex)
+				{
+					//用户管理
+					case 1:
+						LoadPlugin("iHouseUserManager");
+						break;
+					
+					//模型/素材库
+					case 2:
+						LoadPlugin("iHouseResourceManager");
+						break;
+					
+					//共享方案管理
+					case 3:
+						LoadPlugin("iHouseShareManager");
+						break;
+					
+					//用户方案管理
+					case 4:
+						LoadPlugin("iHouseSchemeManager");
+						break;
+					
+					//个人收藏
+					/* case 5:	
+						LoadPlugin("iHouseFavoriteManager");
+						break; */
+					
+					//户型管理
+					case 5:	
+						LoadPlugin("iHouseTypeManager");
+						break;
+				}
+			}
+			
+		]]>
+	</fx:Script>			
+	<fx:Declarations>
+		
+	</fx:Declarations>	
+
+	<!--<s:Group top="0" left="0" right="0" height="48" mouseDown="this.startDrag();" mouseUp="this.stopDrag()">-->
+	<s:Group top="0" left="0" right="0" height="40">
+		<s:Rect top="1" left="1" right="1" height="40" >
+			<s:fill>
+				<s:SolidColor color="#191B21"/>
+			</s:fill>
+		</s:Rect>
+	</s:Group>		 
+	
+<!--	<s:Rect left="0" y="48" right="0" height="2">
+		<s:fill>
+			<s:SolidColor color="#FF7F27"/>
+		</s:fill>
+	</s:Rect> --> 
+	<s:Label id="mTitleName" y="10" left="{this.width/2-100}" width="250" color="#FFFFFF"
+			 fontFamily="宋体" fontSize="20" text="" textAlign="center"/>
+	
+	<s:Label id="mUser" y="20" right="5" width="196" color="#FFFFFF" fontFamily="宋体" fontSize="15" text="" textAlign="right"/>
+
+	
+	<s:RadioButton left="1" top="1" id="iHouseUserManager" label="111" skinClass ="Skins.MainMenuBarBtn" 
+				   buttonMode="true" useHandCursor="true"  click="ChangeTabView(1);" width="100" selected="true" visible="false"/>		
+	
+	<s:RadioButton left="102" top="1" id="iHouseResourceManager"  skinClass="Skins.MainMenuBarBtn" 
+				   label="222"  width="100"
+				   buttonMode="true" useHandCursor="true" click="ChangeTabView(2);" visible="false"/>
+	
+	<s:RadioButton left="203" top="1" id="iHouseShareManager" skinClass="Skins.MainMenuBarBtn" 
+				   label="333" width="100"
+				   buttonMode="true" useHandCursor="true" click="ChangeTabView(3);" visible="false"/>	
+	
+	
+	<s:RadioButton left="304" top="1" id="iHouseSchemeManager" skinClass="Skins.MainMenuBarBtn" 
+				   label="444" width="100" 
+				   buttonMode="true" useHandCursor="true" click="ChangeTabView(4);" visible="false"/>	
+	
+<!--	<s:RadioButton left="405" top="1" id="iHouseUserCollect" skinClass="Skins.MainMenuBarBtn" 
+				   label="个人收藏" width="100"
+				   buttonMode="true" useHandCursor="true" click="ChangeTabView(5);" visible="false"/>-->
+	
+	<s:RadioButton left="405" top="1" id="iHouseTypeManager" skinClass="Skins.MainMenuBarBtn" 
+				   label="555" width="100"
+				   buttonMode="true" useHandCursor="true" click="ChangeTabView(5);" visible="false"/>
+
+	<local:LoginDialog  id="mLoginDialog"  m_iHouse="{this}" x="{(this.width-mLoginDialog.width)/2}"  y="{(this.height-mLoginDialog.height)/2-48}" visible="true"  />
+	<UI:HelpDialog 	    id="mHelpDialog"   m_iHouse="{this}" x="{(this.width-mHelpDialog.width)/2}" y="{(this.height-mHelpDialog.height)/2}" visible="false"  />
+	<UI:AlertDialog 	id="mAlertDialog"  m_iHouse="{this}" x="{(this.width-mAlertDialog.width)/2}" y="{(this.height-mAlertDialog.height)/2}" visible="false"  />
+	<UI:YesNoDialog 	id="mYesNoDialog"  m_iHouse="{this}" x="{(this.width-mYesNoDialog.width)/2}" y="{(this.height-mYesNoDialog.height)/2}" visible="false"  />
+	
+</s:Application>

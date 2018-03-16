@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Skin xmlns:s="library://ns.adobe.com/flex/spark"
+		xmlns:fx="http://ns.adobe.com/mxml/2009"
+		xmlns:ATE="http://ns.adobe.com/ate/2009"
+		xmlns:ai="http://ns.adobe.com/ai/2009"
+		xmlns:d="http://ns.adobe.com/fxg/2008/dt"
+		xmlns:flm="http://ns.adobe.com/flame/2008"
+		xmlns:lib="assets.graphics.imported.*"
+		xmlns:fc="http://ns.adobe.com/flashcatalyst/2009"
+		width="100" height="40">
+	<fx:Metadata>[HostComponent("spark.components.Button")]</fx:Metadata>
+	<s:states>
+		<s:State name="up"/>
+		<s:State name="over"/>
+		<s:State name="down"/>
+		<s:State name="disabled"/>
+	</s:states>
+	<s:Rect left="0" right="0" top="0" bottom="0" radiusX="1">
+		<s:stroke>
+			<s:SolidColorStroke caps="none" color="#000000" joints="miter" miterLimit="4" weight="1"/>
+		</s:stroke>
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry alpha="1.0" color="#4A5157" ratio="0"/>
+				<s:GradientEntry alpha="1.0" color="#2C3033" ratio="1"/>
+			</s:LinearGradient>
+		</s:fill>
+		<s:filters>
+			<s:DropShadowFilter alpha="0.5" angle="90" blurX="8" blurY="8" color="#000000"
+								distance="6" hideObject="false" inner="false" knockout="false"
+								quality="2" strength="1"
+								blurX.down="5" blurY.down="5" distance.down="3"/>
+			<s:DropShadowFilter alpha="0.5" angle="270" blurX="0" blurY="0" color="#000000"
+								distance="5" hideObject="false" inner="true" knockout="false"
+								quality="2" strength="1"/>
+		</s:filters>
+		<s:fill.over>
+			<s:SolidColor color="#4A5157"/>
+		</s:fill.over>
+		<s:fill.down>
+			<s:SolidColor color="#2C3033"/>
+		</s:fill.down>	
+	</s:Rect>
+	<s:Line left="1" right="1" top="1" xTo="97">
+		<s:stroke>
+			<s:SolidColorStroke alpha="0.18" caps="none" color="#FFFFFF" joints="miter"
+								miterLimit="4" weight="1"/>
+		</s:stroke>
+	</s:Line>
+	<s:RichText id="labelDisplay" left="12" right="12" top="5" bottom="5" color="#F0F0F0"
+				fontFamily="宋体" fontSize="15" lineHeight="100%" tabStops="S0 S50"
+				textAlign="center"
+				verticalAlign="middle">
+		<s:filters>
+			<s:DropShadowFilter alpha="0.5" angle="45.0" blurX="1" blurY="1" color="#000000"
+								distance="2" hideObject="false" inner="false" knockout="false"
+								quality="2" strength="1"/>
+		</s:filters>
+	</s:RichText>
+</s:Skin>

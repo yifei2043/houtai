@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="250" height="500">
+	
+	<fx:Script>
+		<![CDATA[
+			import flash.display3D.IndexBuffer3D;
+			
+			import mx.collections.ArrayCollection;
+			public var m_iHousePanoramic:iHousePanoramic;			
+			public var mImageProvider:ArrayCollection = new ArrayCollection();
+			
+			public var mRelevanceImage:String = "";
+			
+			public var mPicLoaded:Boolean = false;
+			public var mCurrentSelect:String = "";
+			
+			public function LoadImages():void
+			{
+				if(mPicLoaded)
+					return;
+				
+				var index:uint = 1;
+				for each(var img:String in m_iHousePanoramic.arrayImages)
+				{
+					mImageProvider.addItem({thumbnailImage:img,picIndex:index,parent:this,option:false});
+				}
+						 
+				mPicLoaded = true;
+			}
+			
+			public function SetOptionIndex(indexOpt:String)
+			{
+				for(var index:uint = 0; index < mImageProvider.length; ++index)
+				{
+					var obj:Object = mImageProvider[index];
+					
+					if((index + 1).toString() == indexOpt)					
+					{
+						obj.option = true;						
+					}
+					else
+					{
+						obj.option = false;
+					}
+					
+					mImageProvider.itemUpdated(obj);					
+				}	
+			}
+			
+			//清除勾选外的其它checkbox,设置成不勾选
+			public function OnResetOption(thumbnailImage:String):void
+			{
+				mCurrentSelect = "";
+				mRelevanceImage = thumbnailImage;
+				
+				for(var index:uint = 0; index < mImageProvider.length; ++index)
+				{
+					var obj:Object = mImageProvider[index];
+					
+					if(thumbnailImage != obj.thumbnailImage)
+					{
+						obj.option = false;
+						mImageProvider.itemUpdated(obj);
+					}
+					else
+					{
+						obj.option = true;
+						mCurrentSelect = (index + 1).toString();
+					}
+				}								
+			}
+			
+			protected function OnOK(event:MouseEvent):void
+			{
+				m_iHousePanoramic.mListView.OnRelevanceImage(mRelevanceImage,mCurrentSelect);
+				visible = false;
+			}
+			
+			public function OnClose():void
+			{
+				visible = false;
+			}
+			
+			protected function OnCancel(event:MouseEvent):void
+			{
+				visible = false;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<mx:Blur id="blurOn" blurXFrom="0.0" blurXTo="10.0" blurYFrom="0.0" blurYTo="10.0"/>
+		<mx:Blur id="blurOut" blurXFrom="10.0" blurXTo="0.0" blurYFrom="10.0" blurYTo="0.0"/>	
+	</fx:Declarations>
+	
+	<s:Rect x="-1000" y="-1000" width="5000" height="5000" alpha="0.5">
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>
+	<s:Group left="0" right="0" top="0" bottom="0" >
+		<s:Rect right="5" top="5" left="5" bottom="5" radiusX="5">
+			<s:fill>
+				<s:SolidColor color="#ffffff"/>
+			</s:fill>		
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="8" blurY="8" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 		
+		</s:Rect>	
+		<s:Rect right="-6.5" top="-11.5" width="35" height="35" radiusX="45">
+			<s:stroke>
+				<s:SolidColorStroke color="#ffffff" caps="none" weight="3" joints="miter" miterLimit="4"/>
+			</s:stroke>	
+			<s:fill>
+				<s:SolidColor color="#000000"/>
+			</s:fill>
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="4" blurY="4" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 	
+		</s:Rect>	
+		
+		<s:Button right="125" bottom="14" width="54" height="25" label="确定" click="OnOK(event)"/>
+		<s:Button right="67" bottom="14" width="54" height="25" label="取消" click="OnCancel(event)"/>
+		
+		<s:List id="mListPic" left="20" top="75" width="210" bottom="51" skinClass="Skins.HouseListSkin1" dataProvider="{mImageProvider}" 
+				itemRenderer="Skins.ListItemOptionRenderer"></s:List>
+		
+		<s:Image right="3" top="-3"  source="@Embed('/assets/close.png')" 
+				 mouseDownEffect="{blurOn}" mouseUpEffect="{blurOut}"
+				 buttonMode="true" click="this.visible=false;" />
+		
+		<s:Label left="23"  top="30" fontFamily="宋体" fontSize="20" text="选择要进入的房间"/>
+		<s:Group  left="15" right="42" top="10" height="50" mouseDown="this.startDrag();" mouseUp="this.stopDrag()"/>
+	</s:Group>
+	<s:Rect right="10"  left="10" top="65">
+		<s:stroke>
+			<s:SolidColorStroke color="#dddddd" caps="none" weight="2" joints="miter" miterLimit="1"/>
+		</s:stroke>			
+	</s:Rect>
+	
+	<s:Rect right="10"  left="10" bottom="45">
+		<s:stroke>
+			<s:SolidColorStroke color="#dddddd" caps="none" weight="2" joints="miter" miterLimit="1"/>
+		</s:stroke>			
+	</s:Rect>	
+</s:Group>

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="550" height="320">
+	
+	<fx:Script>
+		<![CDATA[
+			public var m_iHouse:iHouseSchemeManager;
+			
+			public function SetSchemeData(sceneInfo:Object):void
+			{
+				mTextScheme.text = sceneInfo.sceneName;   //方案名称
+				mDescript.text   = sceneInfo.desc;        //描述
+				mTextName.text   = sceneInfo.custoerName; //客户名称
+				mTextAddr.text   = sceneInfo.address;     //地址
+				mTextArea.text   = sceneInfo.area;        //面积
+				mTextStyle.text  = sceneInfo.style;       //风格
+				mTextCreateTime.text = sceneInfo.date;    //创建时间
+				
+				visible = true;
+			}
+			
+			protected function OnCancel(event:MouseEvent):void
+			{
+				visible=false;
+			}
+			
+		]]>
+	</fx:Script>
+	  
+	<fx:Declarations>
+		<mx:Blur id="blurOn" blurXFrom="0.0" blurXTo="10.0" blurYFrom="0.0" blurYTo="10.0"/>
+		<mx:Blur id="blurOut" blurXFrom="10.0" blurXTo="0.0" blurYFrom="10.0" blurYTo="0.0"/>	
+	</fx:Declarations>
+	<s:Rect x="-1000" y="-1000" width="5000" height="5000" alpha="0.5">
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>
+	<s:Group left="0" right="0" top="0" bottom="0" >
+		<s:Rect right="20" top="20" left="10" bottom="8" radiusX="5">
+			<s:fill>
+				<s:SolidColor color="#ffffff"/>
+			</s:fill>		
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="8" blurY="8" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 		
+		</s:Rect>	
+		<s:Rect right="0" top="0" width="35" height="35" radiusX="45">
+			<s:stroke>
+				<s:SolidColorStroke color="#ffffff" caps="none" weight="3" joints="miter" miterLimit="4"/>
+			</s:stroke>	
+			<s:fill>
+				<s:SolidColor color="#000000"/>
+			</s:fill>
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="4" blurY="4" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 	
+		</s:Rect>	
+		
+		<s:Image right="8" top="10"  source="@Embed('/assets/close.png')" 
+				 mouseDownEffect="{blurOn}" mouseUpEffect="{blurOut}"
+				 buttonMode="true" click="OnCancel(event)" />
+		<s:Label x="23" id="mTitle"  y="30" fontFamily="宋体" fontSize="25" fontStyle="italic" text="用户方案"/>
+		
+		<s:Rect right="33"  left="22" top="65">
+			<s:stroke>
+				<s:SolidColorStroke color="#dddddd" caps="none" weight="1" joints="miter" miterLimit="1"/>
+			</s:stroke>			
+		</s:Rect>	
+		<mx:TextInput id="mTextCreateTime" left="108" top="171" width="138"/>
+		<s:Group left="10" top="20" width="496" height="47" mouseDown="this.startDrag();" mouseUp="this.stopDrag()">
+		</s:Group>
+		<s:Label id="mStyle" x="25" y="127" width="76" fontFamily="宋体" fontSize="15" text="风格："
+				 textAlign="right"/>
+		<s:TextInput id="mTextStyle" x="108" y="126" width="138" tabIndex="6"/>
+		<s:Label x="20" y="173" width="89" fontFamily="宋体" fontSize="15" text="创建时间："
+				 textAlign="right"/>
+		<s:Label x="37" y="215" width="65" fontFamily="宋体" fontSize="15" text="地址：" textAlign="right"/>
+		<s:TextInput id="mTextAddr" x="108" y="212" width="380" tabIndex="3"/>
+		
+	</s:Group>
+	<s:RichText visible="false" x="520" y="35" color="#FCFBFB" fontFamily="宋体" fontSize="14" fontWeight="normal" tabStops="S0 S50" text="渲染完后自动保存到方案效果图集"/>
+	<s:Label left="20" top="87"  width="89" fontFamily="宋体" fontSize="15" text="方案名称："  textAlign="right"/>
+	<s:Label left="20" top="255" width="89" fontFamily="宋体" fontSize="15" text="内容描述："  textAlign="right"/>
+	<s:Label id="mUserName" left="274" top="87" width="75" fontFamily="宋体" fontSize="15" text="客户姓名："
+			 textAlign="right"/>
+	<s:Label id="mArea" left="284" top="133" width="65" fontFamily="宋体" fontSize="15" text="面积："
+			 textAlign="right"/>
+	<s:TextInput id="mTextScheme" left="108" top="85" width="138" tabIndex="1" fontFamily="宋体" />
+	<s:TextInput id="mDescript" left="108" top="254" width="380" tabIndex="9" fontFamily="宋体" />
+	<s:TextInput id="mTextName" left="350" top="85" width="138" tabIndex="2" fontFamily="宋体" />
+	<s:TextInput id="mTextArea" left="350" top="132" width="138" tabIndex="4" fontFamily="宋体" />
+</s:Group>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:s="library://ns.adobe.com/flex/spark"
+				xmlns:fx="http://ns.adobe.com/mxml/2009"
+				xmlns:d="http://ns.adobe.com/fxg/2008/dt"
+				width="200" height="130">
+	<fx:Script>
+		<![CDATA[
+
+
+			public function ShowPanoramicImage():void
+			{
+				//data.parent.ShowPanoramicImage(data.thumbnailImage);
+			}
+
+			protected function OnOptionClick(event:MouseEvent):void
+			{
+				data.option = mOption.selected;
+				
+				data.parent.OnResetOption(data.thumbnailImage);
+			}
+			
+		]]>
+		
+	</fx:Script>
+	<s:Image left="5" top="5" right="5" bottom="5" horizontalCenter="0"
+			 scaleMode="stretch" smooth="true" source="{data.thumbnailImage}" click="{mOption.selected=true};OnOptionClick(event)"/>
+	
+	<s:RadioButton id="mOption" left="10" top="53" click="OnOptionClick(event)" selected="{data.option}" visible="true"/>
+
+</s:ItemRenderer>

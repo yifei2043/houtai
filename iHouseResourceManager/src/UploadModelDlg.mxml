@@ -1,0 +1,1621 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="750" height="580" creationComplete="init()">
+	
+	<fx:Script>
+		<![CDATA[	
+			import Skins.BudgetRenderer;
+			
+			import UI.ResourceAlertDialog;
+			
+			import com.adobe.serialization.json.*;
+			
+			import flash.display3D.IndexBuffer3D;
+			import flash.net.navigateToURL;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.Form;
+			import mx.controls.Alert;
+			import mx.controls.ProgressBar;
+			import mx.core.UIComponent;
+			import mx.events.CollectionEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ItemClickEvent;
+			import mx.events.ListEvent;
+			import mx.rpc.AbstractOperation;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.InvokeEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.utils.UIDUtil;
+			
+			import spark.events.IndexChangeEvent;
+			import spark.events.TextOperationEvent;
+
+			private var TypeGroup:ArrayCollection		= new ArrayCollection();
+			
+			private var fileRefs:FileReferenceList  	= new FileReferenceList();  
+			private var ImageGroup:ArrayCollection   	= new ArrayCollection();
+			private var RenderGroup:ArrayCollection  	= new ArrayCollection();
+			private var VRGroup:ArrayCollection  		= new ArrayCollection();
+			public  var m_iHouse:iHouseResourceManager;
+			
+			private var m_strName:String;
+			private var m_strSize:String;
+			private var m_strFile:String;
+			private var m_iType:int = 0;		// 0 地面 1 墙面 2 顶面
+			private var m_strUUID:String; 	
+			
+			private var vrsceneFileName:String;
+			private var vrSceneFileNameTemp:String;
+			private var uploadModel:UploadMatDlg = new UploadMatDlg;
+			
+			private var m3DSModel:Boolean = false;
+			private var m3DSPathFileName:String = "";
+			private var mUpload3DFile:Boolean = true; //上传是的3d文件还是vrscene文件
+			
+			private function init():void
+			{
+				fileRefs.addEventListener(Event.SELECT,fileSelectHandler);
+				fileRefs.addEventListener(IOErrorEvent.IO_ERROR,ioErrorHandler);
+				fileRefs.addEventListener(Event.COMPLETE, completeHandler); 
+				
+				TypeGroup.addItem({label:"地面"});
+				TypeGroup.addItem({label:"墙面"});
+				TypeGroup.addItem({label:"顶面"});
+				mType.selectedIndex = 0;
+				m_iType = 0;
+			}
+			
+			public function HidePriceText():void
+			{
+				mPriceUnit.visible = false;
+				mPrice.visible = false;
+				mPriceText.visible = false;
+			}
+			
+			/***
+			 * 添加新记录
+			 * 
+			 */
+			public function AddShow(node1Name:String,node2Name:String,node3Name:String):void
+			{
+				this.visible = true;
+				mName.enabled = true;
+				mUpload3DFile = true;
+				
+				OnReset();
+				
+				if(node1Name !="" && node1Name !="" && node1Name !="")
+				{
+					mClass.label = node1Name + "-" + node2Name + "-" + node3Name;
+				}
+				else
+				{
+					mClass.label = "选择分类...";
+				}
+				
+				m_strUUID = UIDUtil.createUID();
+				mBtn0.selected = true;
+			}
+			
+			var m_DeleteFile:Boolean = false;
+			public function OnDeleteFile(strFileName:String):void
+			{	
+				m_bUploadFile = false;	
+				
+				//渲染端只下载vrscene目录下文件
+				if(true == mListVR.visible)
+				{		
+					m_DeleteFile = true;
+				}
+				
+				strFileName = strFileName.split("\\").join("\\\\");
+				
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("DeleteFile");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnDeleteResult);
+				m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnDeleteFault);	
+				op.send("ihouse\\data\\jiaju\\"+strFileName, strFileName);
+			}		
+			
+			/***
+			 * 修改已有记录
+			 * 
+			 */
+			var strModelUUID:String = null;
+			public function ModifyShow(strUUID:String):void
+			{
+				strModelUUID = strUUID;
+				m_DeleteFile = false;
+				
+				var strSql:String ="select * from model where uuid ='"+strUUID+"'";
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("DoSql");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnErrorModify);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnResultModify);
+				op.send(strSql,'6E897B0F-1440-7196-96C1-05C879E9399A',m_iHouse.mStrUserID,m_iHouse.mStrAccountType);	
+				this.visible = true;
+				mName.enabled = false;
+			}
+			
+			private function OnErrorModify(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnErrorModify);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResultModify);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试.");	   
+			}
+			
+			public var m_strData:String;
+			public var m_VRFileCount:int = 0;
+			public function OnResultModify(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnErrorModify);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResultModify);
+				
+				m_strData   = e.result.toString();
+	
+				var recordArray:Array = m_strData.split("#");
+				if( recordArray.length <=1 )
+				{
+					m_iHouse.mHelpDialog.show("没查到记录");
+					this.visible = false;
+					return;
+				}
+				
+				var strRecordArray:Array = recordArray[1].split("~");
+				
+				mName.text 	 = strRecordArray[3];
+				mClass.label = strRecordArray[0]+"-"+strRecordArray[1]+"-"+strRecordArray[2];
+				
+				var sizArray:Array = strRecordArray[4].split("-");
+				mLength.text = sizArray[0]; 
+				mWidth.text  = sizArray[1];
+				mHeight.text = sizArray[2];
+				mPrice.text  = strRecordArray[10];
+				mType.selectedIndex = int(strRecordArray[6]); 	// 类型
+				m_iType = int(strRecordArray[6]);
+				
+				if(strRecordArray.length > 17)
+					mModelName.text = strRecordArray[16];
+				
+				//模型属性，用于前端查询
+				mTextAttribute.text = (strRecordArray.length >= 15) ? strRecordArray[14] : "";
+				
+				// 路径
+				mPathText.text = "data\\jiaju";
+				var strTmpArray:Array 	= recordArray[1].split("~");
+				var tmpArray:Array		= strTmpArray[5].split("\\");
+				for( var k:int =0; k<4; k++ )
+					mPathText.text += "\\"+ tmpArray[k];	
+				
+				mPathText.text += "\\vrscene";
+				
+  				for( var i:int = 1;i<recordArray.length; i++ )  
+				{
+					var strRecordArray:Array = recordArray[i].split("~");
+					
+					m_strUUID = strRecordArray[9]; // 得到UUID
+					
+					if( (int(strRecordArray[7]) == 0 || int(strRecordArray[7]) == 2)  && strRecordArray[5] !="e082de32-fb77-46cf-9da2-d72d8909d73a")
+					{
+						//var strPathFile:String="/";
+						var tmpArray:Array = strRecordArray[5].split("\\");
+						/* for( var k:int =0; k<tmpArray.length; k++ )
+							strPathFile += "/"+ tmpArray[k]; */
+						
+						var strPathFile:String = strRecordArray[5].toString().replace(/\\/g,"/");
+						
+						RenderGroup.addItem({image:m_iHouse.mDataProcess.webserviceAddr+"ihouse/data/jiaju/"+strPathFile, 
+											 name:tmpArray[tmpArray.length-1], 
+											 pathname:strRecordArray[5],
+											 size:strRecordArray[4], 
+											 imageSize:strRecordArray[8],
+											 pwnd:this, 
+											 progress:null, 
+											 deletbtn:null,
+											 bCheck:false,
+											 bUpload:true});	
+						
+						if(int(strRecordArray[7]) == 2)
+						   mIcon.source = m_iHouse.mDataProcess.webserviceAddr+"ihouse/data/jiaju/"+strPathFile;
+						
+						++m_iCountFile;
+					}
+					
+					if( int(strRecordArray[7]) == 1 && strRecordArray[5] !="e082de32-fb77-46cf-9da2-d72d8909d73a")	// 是渲染资源
+					{
+						//var strPathFile:String="/";
+						var tmpArray:Array = strRecordArray[5].split("\\");
+						/*
+						for( var k:int =0; k<tmpArray.length; k++ )
+							strPathFile += "/"+ tmpArray[k];
+						*/
+						var strPathFile:String = strRecordArray[5].toString().replace(/\\/g,"/");
+						
+						VRGroup.addItem({image:m_iHouse.mDataProcess.webserviceAddr+"ihouse/data/jiaju/"+strPathFile, 
+										 name:tmpArray[tmpArray.length-1], 
+										 pathname:strRecordArray[5],
+										 size:strRecordArray[4], 
+										 imageSize:"",
+										 pwnd:this, 
+										 progress:null, 
+										 deletbtn:null, 
+										 bCheck:false,
+										 bUpload:true});
+						
+						
+					}
+				} 
+				
+				m_VRFileCount = VRGroup.length;
+				
+			} 			
+
+			private function CheckValue():Boolean
+			{
+				
+				if( mName.text.length <=0 )
+				{
+					m_iHouse.mHelpDialog.show("请填写名称.");
+					return false;
+				}
+				
+				if(int(mLength.text)<=0)
+				{
+					m_iHouse.mHelpDialog.show("请填写长.");
+					return false;					
+				}
+				
+				if( int(mWidth.text)<=0)
+				{
+					m_iHouse.mHelpDialog.show("请填写宽.");
+					return false;					
+				}
+				
+				if(int(mHeight.text)<=0)
+				{
+					m_iHouse.mHelpDialog.show("请填写高.");
+					return false;					
+				}
+				
+				
+				if(mClass.label == "选择分类..." )
+				{
+					m_iHouse.mHelpDialog.show("请选择分类.");
+					return false;						
+				}
+				
+				m_strName  = mName.text;
+				m_strSize  = mLength.text +"-"+ mWidth.text +"-"+ mHeight.text;
+
+				arrayClass = mClass.label.split("-");
+				m_iClass   = 0;
+				return true;
+			}
+			
+			private function GenerateFloderUUID():String
+			{
+				var strUUID:String = UIDUtil.createUID();
+				var arrayTemp:Array = strUUID.split("-");	// 去掉 "-"
+				var strFloder:String ="c";
+				for( var k:int =0; k<arrayTemp.length; k++ )
+					strFloder += arrayTemp[k];
+				
+				return strFloder;
+			}
+			
+			/**
+			 * 添加三级分类,如果已存在返回分类UUID做为文件夹
+			 * 
+			 */
+			private var m_iClass:int = 0;
+			private var arrayClass:Array;
+			private var m_strClassUUID0:String;
+			private var m_strClassUUID1:String;
+			private var m_strClassUUID2:String;
+			private var m_strFloder:String;
+			private var m_strPathFile:String; // 保持到数据库的路径
+			private function OnAddClassResult(e:ResultEvent):void
+			{
+				var strFloder:String = GenerateFloderUUID();	
+				
+				if(m_iClass == 1 || m_iClass == 2 || m_iClass == 3)
+				{
+					m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnAddClassResult);
+					m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnAddClassFault);	
+				}
+				
+				switch( m_iClass )
+				{
+					//插入第一级目录(name,uuid) 保存在keyword表中,如果存在则返回原来uuid
+					case 0:
+					{
+						var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("AddClass");
+						m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnAddClassResult);
+						m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnAddClassFault);	
+						op.send(arrayClass[0],strFloder);
+					}
+					break;
+					//插入第二级目录(name,uuid)  保存在keyword表中
+					case 1:
+					{	
+						m_strClassUUID0 = e.result.toString();
+						var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("AddClass");
+						m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnAddClassResult);
+						m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnAddClassFault);	
+						
+						op.send(arrayClass[1],strFloder);
+					}
+					break;
+					
+					//插入第三级目录(name,uuid)  保存在keyword表中
+					case 2:
+					{
+						m_strClassUUID1 = e.result.toString();
+						var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("AddClass");
+						m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnAddClassResult);
+						m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnAddClassFault);	
+						
+						op.send(arrayClass[2],strFloder);
+					}
+					break;
+					
+					//生成三级路径目录
+					case 3:
+					{
+						m_strClassUUID2 = e.result.toString();
+						m_strFloder = "ihouse\\data\\jiaju\\"+m_strClassUUID0+"\\"+m_strClassUUID1+"\\"+m_strClassUUID2+"\\"+mName.text+"\\";
+						m_strPathFile = m_strClassUUID0+"\\\\"+m_strClassUUID1+"\\\\"+m_strClassUUID2+"\\\\"+mName.text+"\\\\";
+						mPathText.text = "data\\jiaju\\"+m_strClassUUID0+"\\"+m_strClassUUID1+"\\"+m_strClassUUID2+"\\"+mName.text+"\\vrscene";
+					}
+						break;  
+				}
+				m_iClass++;
+			}
+			
+			private function OnAddClassFault(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnAddClassResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnAddClassFault);	
+				
+				m_iHouse.mHelpDialog.show("添加分类失败.");	 
+			}
+
+			/****
+			 * 批量选择模型
+			 * 
+			 * 
+			 */
+			private var m_iFileIsNull:int = 0;
+			private function selectFile():void
+			{	
+				if( CheckValue() == false )
+					return;
+				
+				OnAddClassResult(null);// 创分类
+				
+				var fileFiter1:FileFilter=new FileFilter("All Files","*.*");
+				fileRefs.browse([fileFiter1]);				
+				m_iFileIsNull = 0;						
+			}
+			
+			private function CheckName():void
+			{
+				if( mName.enabled == false )
+					return;
+				
+				if( mName.text.length <=0  )
+				{
+					m_iHouse.mHelpDialog.show("请填写名称.");
+					return;
+				}
+				
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("CheckName");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnResultName);
+				op.send(mName.text,1);
+			}
+			
+			private function OnResultName(event:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnResultName);
+				
+				var str:String = event.result.toString();
+				
+				if( str == "1")
+					m_iHouse.mHelpDialog.show("名称不唯一,请修改.");
+			}				
+
+			private function fileSelectHandler(event:Event):void
+			{
+				m_iCountFile = 0;
+				m3DSModel = false;
+				m3DSPathFileName = "";
+				
+				//上传模型文件还是vrscene文件
+				if(mBtn0.selected)
+					mUpload3DFile = true;
+				else
+					mUpload3DFile = false;
+				
+				for each (var f:FileReference in fileRefs.fileList)	//遍历选择的文件
+				{ 
+					f.addEventListener(Event.COMPLETE, completeHandler);
+					f.load();
+				}				      
+			}
+			   
+			private function completeHandler(e:Event):void
+			{	
+				var f:FileReference = e.target as FileReference;
+				f.removeEventListener(Event.COMPLETE,completeHandler);
+				
+				if( f.data.length == 0 )	// 文件为空时不上传
+				{
+					m_iFileIsNull++;
+					
+					/* 自动填入模型尺寸(由于有些客户不想增加.size文件，暂时不使用)
+					//判断是否为模型尺寸文件
+					var strFileName:String = e.target.name;
+					if(-1 != strFileName.indexOf(".size"))
+					{
+						strFileName = strFileName.substring(0,strFileName.indexOf(".") );
+						var arrSize:Array = strFileName.toLocaleLowerCase().split("x");
+						
+						if(arrSize.length == 3)
+						{
+							mLength.text = arrSize[0];
+							mWidth.text = arrSize[1];
+							mHeight.text = arrSize[2];
+							
+							m_strSize  = mLength.text +"-"+ mWidth.text +"-"+ mHeight.text;
+						}
+					}
+					*/
+					
+					return;   
+				}
+				
+				//if( mList3D.visible == true )	// 同名覆盖
+				if(mUpload3DFile == true)
+				{
+					for( var i:int = 0; i<RenderGroup.length; i++ )
+					{
+						if( RenderGroup[i].name == e.target.name )
+						{
+							m_iHouse.mHelpDialog.show("库中有"+e.target.name+"同名文件.");
+							return;
+						}
+					}
+				}
+				else
+				{			
+					for( var i:int = 0; i<VRGroup.length; i++ )
+					{
+						if( VRGroup[i].name == e.target.name )
+						{
+							m_iHouse.mHelpDialog.show("渲染库内有"+e.target.name+"同名文件.");
+							return;
+						}
+					}
+				}
+				
+				var loader:Loader=new Loader();
+				ImageGroup.addItem({image:e.target.data, name:e.target.name, size:Number(e.target.size/1024).toFixed(2)+"kb", imageSize:"", Obj:loader});	
+				loader.contentLoaderInfo.addEventListener(Event.COMPLETE,loader_completeHandler); 
+				loader.contentLoaderInfo.addEventListener(IOErrorEvent.IO_ERROR, loader_ioErrorHandler); 				
+				loader.loadBytes(e.target.data);			
+			}
+			
+			private function ioErrorHandler(e:IOErrorEvent):void
+			{
+				m_iHouse.mHelpDialog.show(e.text);
+			}	
+			
+			public function CheckUploadFile():Boolean
+			{
+				//上传的文件名只能为字母数字下划线，并且文件名开头只能为字母
+				var pattern:RegExp=/^[a-zA-Z][a-zA-Z0-9_.]*$/;
+				
+				var fileCollection:ArrayCollection = null;
+				
+				if(mUpload3DFile == true)
+				{
+					fileCollection = RenderGroup;
+				}
+				else
+				{
+					fileCollection = VRGroup;
+				}
+				
+				for each(var item:Object in fileCollection)
+				{
+					if(false == pattern.test(item.name)  )
+					{
+						m_iHouse.mHelpDialog.show(item.name + "不符合上传要求(上传的文件名只能为字母数字下划线，并且文件名开头只能为字母)");
+						
+						fileCollection.removeAll();
+						m_iCountFile = 0;
+						
+						if(true == mUpload3DFile)
+						{
+							mList3D.dataProvider = fileCollection;
+						}
+						else
+						{
+							mListVR.dataProvider = fileCollection;
+						}
+						
+						return false;
+					}
+				}
+				
+				return true;
+			}
+			
+			/***
+			 * 不是图片
+			 */
+			private var m_iCountFile:int = 0;
+			private function loader_ioErrorHandler(event:IOErrorEvent):void
+			{
+				for( var i:int =0; i<ImageGroup.length; i++ )
+				{
+					if( ImageGroup[i].Obj == event.currentTarget.loader )
+					{
+						event.currentTarget.loader.removeEventListener(Event.COMPLETE,loader_completeHandler);
+						event.currentTarget.loader.removeEventListener(IOErrorEvent.IO_ERROR, loader_ioErrorHandler);
+						
+						//if( mList3D.visible == true )
+						if(mUpload3DFile == true)
+						{
+							RenderGroup.addItem({image:ImageGroup[i].image, 
+							
+												 name:ImageGroup[i].name,
+												 pathname:"",
+												 size:ImageGroup[i].size,
+												 imageSize:"",
+												 pwnd:this, 
+												 progress:null, 
+												 deletbtn:null, 
+												 bCheck:false,
+												 bUpload:false});	
+						}
+						else
+						{
+							VRGroup.addItem({image:ImageGroup[i].image, 
+							
+											 name:ImageGroup[i].name,
+											 pathname:"",
+											 size:ImageGroup[i].size, 
+											 imageSize:"",
+											 pwnd:this, 
+											 progress:null, 
+											 deletbtn:null,
+											 bCheck:false,
+											 bUpload:false});	
+						}
+						
+						m_iCountFile++;
+						
+						if( m_iCountFile == fileRefs.fileList.length-m_iFileIsNull ) // 全部读入后，立刻上传
+						{
+							if(true == CheckUploadFile())
+							   OnClickUploadList();
+						}	
+						
+						return;
+					}
+				}
+			}
+			
+			/*
+			//设置模型基本信息：模型名称
+			public function SetModelName():Boolean
+			{
+				for each(var item:Object in RenderGroup)
+				{
+					var strFileName:String = item.name;
+					
+					if( -1 != strFileName.toLocaleLowerCase().indexOf(".3ds") || -1 != strFileName.toLocaleLowerCase().indexOf(".a3d") )
+					{
+						strFileName = strFileName.substring(0,strFileName.indexOf(".") );
+						mName.text = strFileName;
+					}
+				}
+				
+				return true;
+			}
+			*/
+
+			private function loader_completeHandler(event:Event):void
+			{
+				var bmp:Bitmap=event.currentTarget.content as Bitmap;
+				
+				var str:String;
+				if( bmp)
+				{
+					str = bmp.bitmapData.width+"X"+bmp.bitmapData.height;
+				}
+				
+				for( var i:int =0; i< ImageGroup.length; i++ )
+				{
+					if( ImageGroup[i].Obj == event.currentTarget.loader )
+					{
+						event.currentTarget.loader.removeEventListener(Event.COMPLETE,loader_completeHandler);
+						event.currentTarget.loader.removeEventListener(IOErrorEvent.IO_ERROR, loader_ioErrorHandler);
+						
+						//if( mList3D.visible == true )
+						if(mUpload3DFile == true)
+						{	
+							RenderGroup.addItem({image:ImageGroup[i].image, 
+												 name:ImageGroup[i].name,
+												 pathname:"",
+												 size:ImageGroup[i].size, 
+												 imageSize:str,
+												 pwnd:this, 
+												 progress:null, 
+												 deletbtn:null, 
+												 bCheck:false,
+												 bUpload:false});	
+						}
+						else
+						{	
+							VRGroup.addItem({image:ImageGroup[i].image, 
+											 name:ImageGroup[i].name,
+											 pathname:"",
+											 size:ImageGroup[i].size, 
+											 imageSize:str,
+											 pwnd:this, 
+											 progress:null, 
+											 deletbtn:null,
+											 bCheck:false,
+											 bUpload:false});	
+						}
+													
+						m_iCountFile++;
+						
+						if( m_iCountFile == fileRefs.fileList.length-m_iFileIsNull )	// 全部读入后，立刻上传
+						{
+							if(false == CheckUploadFile())
+								return;
+								
+							/*
+							//上传3ds文件时需要设置模型信息
+							//if(mList3D.visible == true)
+							if(mUpload3DFile == true)
+							{
+								SetModelName();
+							}
+							*/
+			
+							OnClickUploadList();
+						}	
+						
+						return;
+					}
+				}
+			}
+			
+
+			    			   
+			//开始上传文件
+			//==================================================================================================
+			private var m_iCount:int = 0;
+			private var m_iCountVR:int=0;
+			private function OnClickUploadList():void
+			{
+				m_iCount = 0;
+				m_iCountVR=0;
+				OnUploadListFile();
+			}
+			
+			/***
+			 *  一个一个上传
+			 * 
+			 */
+			private function OnUploadListFile():void		
+			{
+				m_bUploadFile = true;
+				if( m_iCount < RenderGroup.length )	// 3D模型
+				{
+					if( RenderGroup[m_iCount].bUpload == false )	// 未上传
+					{
+						var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("DeleteFile");
+						m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnDeleteResult);
+						m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnDeleteFault);	
+						
+						op.send(m_strFloder+RenderGroup[m_iCount].name);
+					}
+					else
+					{
+						m_iCount++;
+						OnUploadListFile();						
+					}
+				}
+				else
+				{
+					if( m_iCountVR < VRGroup.length )
+					{
+						if( VRGroup[m_iCountVR].bUpload == false )	// 未上传
+						{
+							var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("DeleteFile");
+							m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnDeleteResult);
+							m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnDeleteFault);	
+							op.send(m_strFloder+"vrscene\\"+VRGroup[m_iCountVR].name);
+						}
+						else
+						{
+							m_iCountVR++;
+							OnUploadListFile();						
+						}
+					}
+				}
+				
+				
+				// 方便查询记录
+	 			if( m_iCount >= RenderGroup.length && m_iCountVR >= VRGroup.length )
+				{
+					var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("AddModelUUID");
+					m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnAddModelResult);
+					m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnAddModelFault);	
+					op.send(m_strName,m_strSize,"e082de32-fb77-46cf-9da2-d72d8909d73a",
+						    arrayClass[0],arrayClass[1],arrayClass[2],m_iType,
+						    0,Number(mPrice.text), m_strUUID,
+					        m_iHouse.mStrAccountType,m_iHouse.mStrCompanyID,m_iHouse.mStrUserID);
+				} 
+					
+				//if( mList3D.visible == true )
+				if(mUpload3DFile == true)
+					mNumber.text ="当前有"+RenderGroup.length +"条记录";
+				else
+					mNumber.text ="当前有"+VRGroup.length +"条记录";
+			} 
+
+			private function OnDeleteFault(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnDeleteResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnDeleteFault);
+			//	m_iHouse.mHelpDialog.show("上传文件失败.");	 
+			}			
+			
+			private var fileUpload:ByteArray=new ByteArray();	//要传递的数组
+			private var BlockNum:int=0;						//传递次数
+			private var BlockNumles:int=0;		
+			private var blocksize:int= 102400;					//每次传递大小, 每次上传100K	
+			private var m_bUploadFile:Boolean = true;  
+			private var m_PacketIndex:int = 0;
+			public function OnDeleteResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnDeleteResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnDeleteFault);
+				
+				if( m_bUploadFile == false )		// 是否只是删除
+				{
+					if( mList3D.visible ==true || mUpload3DFile == true)
+						RenderGroup.removeItemAt(mList3D.selectedIndex);
+					else
+						VRGroup.removeItemAt(mListVR.selectedIndex);
+					return;
+				}
+				
+				var retNum:int=int(e.result.toString());
+				if( retNum == 2 || retNum == 0 )// 删除或不存在
+				{
+					if( mList3D.visible ==true  || mUpload3DFile == true)
+					{
+						var BlockNum1:Number=(RenderGroup[m_iCount].image.length /blocksize);
+						BlockNum	=int(BlockNum1);
+						BlockNumles	=int(BlockNum1);
+						m_PacketIndex = 0;
+						OnProgress(0,100);
+						uploadFile(0,blocksize);
+					}
+					else
+					{
+						var BlockNum1:Number=(VRGroup[m_iCountVR].image.length/blocksize);
+						BlockNum	=int(BlockNum1);
+						BlockNumles	=int(BlockNum1);
+						m_PacketIndex = 0;
+						OnProgress(0,100);
+						uploadFile(0,blocksize);
+					}
+				}								
+			}
+			
+			public function uploadFile(begin:int,end:int):void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("WriteFile");
+					
+				
+				if(m_iCount< RenderGroup.length )	// 上传
+				{	
+					m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnRGResult);
+					m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnRGFault);
+					
+					if(RenderGroup[m_iCount].image.length > blocksize)
+					{
+						fileUpload.writeBytes(RenderGroup[m_iCount].image,begin,end);
+						op.send(begin,
+								RenderGroup[m_iCount].name,
+								m_strFloder,
+								fileUpload,
+							    m_strName,
+								m_strPathFile+RenderGroup[m_iCount].name,
+								m_strSize,arrayClass[0],
+								arrayClass[1],
+								arrayClass[2],
+								m_iType, 
+								0, 
+								RenderGroup[m_iCount].size,
+								m_strUUID,
+								m_iHouse.mStrAccountType,
+								m_iHouse.mStrCompanyID,
+								m_iHouse.mStrUserID,
+								mModelName.text);
+					}
+					else
+					{	
+						fileUpload.writeBytes(RenderGroup[m_iCount].image);
+						
+						op.send(0,
+								RenderGroup[m_iCount].name,
+								m_strFloder,fileUpload,
+							    m_strName,
+								m_strPathFile+RenderGroup[m_iCount].name,
+								m_strSize,
+								arrayClass[0],
+								arrayClass[1],
+								arrayClass[2],
+								m_iType,
+								0, 
+								RenderGroup[m_iCount].size,m_strUUID,
+								m_iHouse.mStrAccountType,
+								m_iHouse.mStrCompanyID,
+								m_iHouse.mStrUserID,
+								mModelName.text);
+					}
+					
+					RenderGroup[m_iCount].pathname = m_strPathFile+RenderGroup[m_iCount].name;
+				}
+				else
+				{
+					m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnVRResult);
+					m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnVRFault);
+					
+					if(VRGroup[m_iCountVR].image.length>blocksize)
+					{
+						fileUpload.writeBytes(VRGroup[m_iCountVR].image,begin,end);
+						op.send(begin,
+								VRGroup[m_iCountVR].name,
+								m_strFloder+"vrscene\\",
+								fileUpload,
+								m_strName,
+								m_strPathFile+"vrscene\\\\"+VRGroup[m_iCountVR].name,m_strSize,
+								arrayClass[0],
+								arrayClass[1],
+								arrayClass[2],
+								m_iType, 
+								1, 
+								VRGroup[m_iCountVR].size,
+								m_strUUID,
+								m_iHouse.mStrAccountType,
+								m_iHouse.mStrCompanyID,
+								m_iHouse.mStrUserID);
+					}
+					else
+					{	
+						fileUpload.writeBytes(VRGroup[m_iCountVR].image);
+						op.send(VRGroup[m_iCountVR].image.length,
+								VRGroup[m_iCountVR].name,
+								m_strFloder+"vrscene\\",
+								fileUpload,
+								m_strName,
+								m_strPathFile+"vrscene\\\\"+VRGroup[m_iCountVR].name,
+								m_strSize,
+								arrayClass[0],
+								arrayClass[1],
+								arrayClass[2],
+								m_iType, 
+								1, 
+								VRGroup[m_iCountVR].size,
+								m_strUUID,
+								m_iHouse.mStrAccountType,
+								m_iHouse.mStrCompanyID,
+								m_iHouse.mStrUserID);
+					}
+					
+					VRGroup[m_iCountVR].pathname = m_strPathFile+VRGroup[m_iCountVR].name;
+				}
+			}
+
+			public function OnSendFile():void
+			{
+				fileUpload.clear();			
+				
+				if(m_iCount< RenderGroup.length )	// 上传
+				{					
+					OnProgress(m_PacketIndex*blocksize,RenderGroup[m_iCount].image.length);	//进度条
+					
+					if(BlockNumles>0)
+						uploadFile(m_PacketIndex*blocksize,blocksize);
+					
+					if(BlockNumles==0)
+						uploadFile(m_PacketIndex*blocksize,RenderGroup[m_iCount].image.length-(m_PacketIndex*blocksize) );
+					
+					if(BlockNumles==-1)
+					{	
+						RenderGroup[m_iCount].bUpload = true;
+						if( RenderGroup[m_iCount].progress )
+						{
+							RenderGroup[m_iCount].progress.visible = false;						
+							RenderGroup[m_iCount].deletbtn.enabled = true;
+							RenderGroup[m_iCount].deletbtn.label = "删除";
+						}
+						
+						//设置缩略图
+						if((mName.text + ".jpg") == RenderGroup[m_iCount].name)
+						{
+							mIcon.source = RenderGroup[m_iCount].image;
+						}
+						
+						m_iCount++;
+
+						OnUploadListFile();	
+					}
+				}
+				else
+				{
+					if( m_iCountVR >= VRGroup.length )
+						return;
+					
+					OnProgress(m_PacketIndex*blocksize,VRGroup[m_iCountVR].image.length);	//进度条
+					
+					if(BlockNumles>0)
+						uploadFile(m_PacketIndex*blocksize,blocksize);
+					
+					if(BlockNumles==0)
+						uploadFile(m_PacketIndex*blocksize,VRGroup[m_iCountVR].image.length-(m_PacketIndex*blocksize));
+					
+					if(BlockNumles==-1)
+					{						
+						VRGroup[m_iCountVR].bUpload = true;
+						if( VRGroup[m_iCountVR].progress )
+						{
+							VRGroup[m_iCountVR].progress.visible = false;						
+							VRGroup[m_iCountVR].deletbtn.enabled = true;
+							VRGroup[m_iCountVR].deletbtn.label = "删除";
+						}
+						
+						m_iCountVR++;
+						OnUploadListFile();					
+					}	
+				}
+			}
+			
+			private function OnRGResult(event:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnRGResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnRGFault);
+				
+				var writeLen:int=int(event.result.toString());
+				
+				if( 0 != writeLen)
+				{
+					m_PacketIndex += 1;
+					BlockNumles-=1;
+				}
+				else					
+				{
+					trace("ret write file size==0");
+				}
+				
+				//0 ==writeLen 继续上传上一个包 
+				OnSendFile(); 
+				
+				//全部上传完成时，更新数据表中字段。在缩略图上加上模型为3ds类型
+				if(m_iCount == RenderGroup.length)
+				{
+					//更新数据库设置模型类型
+					for(var iIndex:int = 0; iIndex < RenderGroup.length; ++iIndex)
+					{
+						if( -1 != String(RenderGroup[iIndex].name).indexOf(".3DS") ||
+							-1 != String(RenderGroup[iIndex].name).indexOf(".3ds")) 							
+						{
+							m3DSPathFileName = RenderGroup[iIndex].pathname;	
+							
+							SetModelFormat();
+							break;
+						} 
+					}
+					
+					//设置缩略图
+					OnSetThumbnail(mName.text + ".jpg",true);
+				}
+			}
+			
+			private function OnRGFault(event:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnRGResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnRGFault);
+				OnSendFile();
+				
+			//	m_iHouse.mHelpDialog.show(event.toString());
+			}	
+			
+			private function OnVRResult(event:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnVRResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnVRFault);
+				
+				var writeLen:int=int(event.result.toString());
+				
+				if( 0 != writeLen)
+				{
+					m_PacketIndex += 1;
+					BlockNumles-=1;
+				}
+				else					
+				{
+					trace("ret write file size==0");
+				}
+				
+				//0 ==writeLen 继续上传上一个包 
+				OnSendFile(); 
+				
+				//完成上传文件，如果是vrscene需要转换vrscene文件中的jpg路径
+				if(m_iCountVR == VRGroup.length)
+				{
+					for(var index:int = 0; index < VRGroup.length; ++index)
+					{
+						if(-1 != String(VRGroup[index].name).indexOf(".vrscene"))							
+						{
+							TransformVRScene(mPathText.text + "\\" + VRGroup[index].name);
+							break;
+						}
+					}
+				} 
+			}
+			
+			private function OnVRFault(event:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnVRResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnVRFault);
+				OnSendFile();
+				
+				//	m_iHouse.mHelpDialog.show(event.toString());
+			}
+			
+			protected function OnProgress(Loaded:int,Total:int):void   
+			{   
+				
+				var p:ProgressBar;
+				if(m_iCount< RenderGroup.length )	// 上传
+					p = RenderGroup[m_iCount].progress as ProgressBar;
+				else
+					p = VRGroup[m_iCountVR].progress as ProgressBar;
+				
+				if(p)
+				{
+					p.visible = true;
+					p.setProgress(Loaded,Total);
+				}				
+			} 
+			
+			public function OnReset():void
+			{
+				m_iCount = 0;
+				m_iCountVR=0;
+				m_iCountFile = 0;
+				
+				mName.text  = "";
+				mLength.text = "";
+				mWidth.text = "";
+				mHeight.text = "";
+				mPathText.text = "";
+				mPrice.text = "";	
+				mNumber.text = "";
+				mModelName.text = "";
+				mIcon.source = null;
+				mTextAttribute.text = "";
+				
+				RenderGroup.removeAll();
+				VRGroup.removeAll();
+				mTextAttribute.text = "";
+				
+
+				OnChangeTab(1);
+			}
+			
+			//判断上传是否完成
+			public function UploadCompleted():Boolean
+			{
+				var bRet:Boolean = false;
+
+				if(mUpload3DFile == true)
+				{
+					if(m_iCount !=0 && m_iCount != RenderGroup.length)
+						bRet = false;
+					else
+						bRet = true;
+				}
+				else
+				{
+					if(0 != m_iCountVR && m_iCountVR != VRGroup.length)
+						bRet = false;
+					else
+						bRet = true;
+				}
+				
+				return bRet;
+			}
+			
+			var strNewUUID:String = "0";
+			var m_bUpdateUUID:Boolean = false;
+			public function OnOK():void
+			{
+				if(RenderGroup.length == 0)
+				{
+					m_iHouse.mHelpDialog.show("请选择上传文件");
+					return;
+				}
+				
+/* 				if( RenderGroup.length != m_iCountFile)
+				{
+					m_iHouse.mHelpDialog.show("正在上传文件，请稍候..");
+					return;
+				} */
+				
+				
+				if(false == UploadCompleted())
+				{
+					m_iHouse.mHelpDialog.show("正在上传文件，请稍候...!");
+					return;
+				}
+
+				if( CheckValue() == true )				
+				{
+					strNewUUID = "0";
+					m_bUpdateUUID = false;
+					
+					//vr 列表数据有增加或删除数据时更新uuid(更新uuid主要是为了渲染端做下载)
+					if(m_VRFileCount != VRGroup.length || m_DeleteFile)
+					{
+						strNewUUID = UIDUtil.createUID();
+						strNewUUID = strNewUUID.replace(/-/g,"");
+						m_bUpdateUUID = true;
+					}
+					
+					var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("ModifyModelUUID");
+					m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnModifyModelResult);
+					m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnModifyModelFault);	
+					op.send(m_strName,m_strSize,arrayClass[0],arrayClass[1],arrayClass[2],
+						    m_iType,Number(mPrice.text), m_strUUID,mTextAttribute.text,mModelName.text,strNewUUID);
+					
+					OnClearData();
+				}
+			}
+
+			public function OnClearData():void
+			{
+				//界面刷新(如果有上传模型文件需要刷新)
+				if(0 != m_iCount)
+				   m_iHouse.mDataView.OnChange(null);
+				
+				//清除操作
+				RenderGroup.removeAll();
+				ImageGroup.removeAll();
+				VRGroup.removeAll();
+				
+				m_iCount = 0;
+				m_iCountVR=0;
+				m_iCountFile = 0;
+				mIcon.source  = null;
+				this.visible = false;
+			}
+			
+			public function OnUpdateToRenderServicer(strClass1:String,strClass2:String,strClass3:String,strModelName:String):void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("NotifyServicerDownloadFile");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT, OnNotifyServicerDownloadFileFault);
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnNotifyServicerDownloadFileResult);
+				op.send(strClass1,strClass2,strClass3,strModelName);
+			}
+			
+			private function OnNotifyServicerDownloadFileFault(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnNotifyServicerDownloadFileFault);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnNotifyServicerDownloadFileResult);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试");
+			}	
+			
+			public function OnNotifyServicerDownloadFileResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,  OnNotifyServicerDownloadFileFault);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnNotifyServicerDownloadFileResult);				
+				var strResult:String = e.result.toString();
+				
+				//成功，需要发布到前端
+				if("1" == strResult)
+				{
+					m_iHouse.mDataView.ExportModelAll();
+					
+					//如果有产品信息时，也需要导出
+					if("1" == m_iHouse.mDataProcess.mProductInfo)
+						m_iHouse.mDataView.ExportProductAll();
+				}
+      
+			}
+
+			private function OnList3D(evt:MouseEvent):void
+			{
+/* 				if( mList3D.selectedIndex == -1 )
+					return;
+		
+				var str:String = RenderGroup[mList3D.selectedIndex].imageSize;
+				if( str !="" )
+				{
+					mIcon.source = RenderGroup[mList3D.selectedIndex].image;
+				} */
+			}
+			
+			public function OnChangeTab( iIndex:int ):void
+			{
+				mGroupAttribute.visible = false;
+				//mLabelAttribute.visible = false;
+				//mTextAttribute.visible  = false;
+				
+				mList3D.visible = false;
+				mListVR.visible = false;
+				mNumber.visible = false;
+				selectFileButton.visible = false;
+				
+				if( iIndex == 1)
+				{
+					mNumber.visible = true;
+					selectFileButton.visible = true;
+					mList3D.visible = true;
+					mNumber.text ="当前有"+RenderGroup.length +"条记录";
+					mBtn0.setFocus();
+				}
+				else if( iIndex == 2 )
+				{
+					mNumber.visible = true;
+					selectFileButton.visible = true;
+					mListVR.visible = true;	
+					mNumber.text ="当前有"+VRGroup.length +"条记录"	
+				}
+				else if( iIndex == 3 )
+				{
+					mGroupAttribute.visible = true;
+				}
+			}
+
+			public function OnChangeType(e:IndexChangeEvent):void
+			{
+				m_iType = mType.selectedIndex;
+			}
+
+			public function OnChange(event:ListEvent):void			
+			{
+				if( mTree.selectedItem == null )
+					return;
+				
+				// 一级分类
+				if( mTree.getParentItem(mTree.selectedItem) == null )				
+				{
+					return;
+				}
+				else
+				{
+					// 二级分类
+					if(mTree.getParentItem(mTree.getParentItem(mTree.selectedItem)) == null )
+					{
+/* 						var node11:XML=XML(mFurniture.getParentItem(mFurniture.selectedItem));
+						var node12:XML=XML(mFurniture.selectedItem);
+						DoSql(node11.@Name,node11.@Name,"");	 */	
+						return;
+					}
+			
+					var node1:XML=XML(mTree.getParentItem(mTree.getParentItem(mTree.selectedItem)));
+					var node2:XML=XML(mTree.getParentItem(mTree.selectedItem));
+					var node3:XML=XML(mTree.selectedItem);
+					mClass.label=node1.@Name+"-"+node2.@Name+"-"+node3.@Name;
+				}
+			}
+			
+			/***
+			 * 设置缩略图
+			 * 
+			 */
+			public function OnSetThumbnail(strName:String,bUse:Boolean):void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("SetThumbnail");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnThumbnailResult);
+				m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnThumbnailFault);
+				
+				if( bUse == true )
+					op.send(m_strPathFile+strName,m_strName, 1);
+				else
+					op.send(m_strPathFile+strName,m_strName, 0);
+			}
+			
+			private function OnThumbnailResult(event:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnThumbnailResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnThumbnailFault);
+				//m_iHouse.mHelpDialog.show("设置缩略图成功.");	 
+			}			
+			
+			private function OnThumbnailFault(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnThumbnailResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnThumbnailFault);
+				m_iHouse.mHelpDialog.show("设置缩略图失败.");	 
+			}	
+			
+			private function OnAddModelResult(event:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnAddModelResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnAddModelFault);	
+				//m_iHouse.mHelpDialog.show("所有文件添加完成.");	 
+			}			
+			
+			private function OnAddModelFault(e:FaultEvent):void
+			{
+				m_iHouse.mHelpDialog.show("参数错误.");	 
+			}	
+			
+			//通知渲染服务器下载文件
+			public function UpdateToRenderServicer():void
+			{
+				var strVrscenePath:String = mPathText.text;
+				strVrscenePath = strVrscenePath.substr(0,strVrscenePath.lastIndexOf("\\"));
+				
+				var nPos:int = strVrscenePath.lastIndexOf("\\");
+				var strModelName:String = strVrscenePath.substr(nPos + 1);
+
+				//更新数据到渲染服务器，发布给前端
+				OnUpdateToRenderServicer(arrayClass[0],arrayClass[1],arrayClass[2],strModelName);
+				
+				OnClearData();
+			}
+			
+			private function OnModifyModelResult(event:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnModifyModelResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnModifyModelFault);
+				//m_iHouse.mHelpDialog.show("所有文件添加完成.");	
+				
+				//更新uuid
+				if(m_bUpdateUUID)
+				{
+					for(var index:int = 0; index < m_iHouse.mDataView.ImageGroup.length; ++index)
+					{
+						var dataViewItem:Object = m_iHouse.mDataView.ImageGroup[index];
+						var viewModelUUID:String = dataViewItem.data[9];
+						
+						if(viewModelUUID == strModelUUID)
+						{
+							dataViewItem.data[9] = strNewUUID;
+							break;
+						}
+					}
+				}
+				
+				UpdateToRenderServicer();
+			}			
+			
+			private function OnModifyModelFault(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnModifyModelResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnModifyModelFault);
+				//m_iHouse.mHelpDialog.show("文件添加失败.");	 
+			}			
+			
+			//判断是否包含中文
+			private function IsContainChinese(fileName:String):Boolean
+			{
+				var pattern:RegExp=/[\u4e00-\u9fa5]/;
+				
+				return pattern.test(fileName);
+			}
+			
+			protected function OnNameChange(event:TextOperationEvent):void
+			{
+				var strName:String = mName.text;
+				
+				if(0 == strName.length)
+					return;
+				
+				var pattern:RegExp=/^[a-zA-Z]/;
+				
+				if(pattern.test(strName) && !IsContainChinese(strName) )
+				{
+					
+				}
+				else
+				{
+					mName.text = "";
+					m_iHouse.mAlertDialog.show("名称只能由字母及数字组成，开头只能为字母并且名称中不能包含中文字符!");
+				}
+			}
+			
+			//转换VRScene文件
+			public function TransformVRScene(strVRSceneFile:String):void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("TransformVRScene");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT, OnTransformVRSceneFault);
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnTransformVRSceneResult);
+				op.send(strVRSceneFile);	
+			}
+			
+			private function OnTransformVRSceneFault(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnTransformVRSceneFault);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnTransformVRSceneResult);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试.");	   
+			}			
+			
+			public function OnTransformVRSceneResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,  OnTransformVRSceneFault);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnTransformVRSceneResult);
+				
+				var jsonStr:String = e.result.toString();
+				//var jsonObj:Object = com.adobe.serialization.json.JSON.decode(jsonStr); 
+				
+			}
+			
+			//设置模型格式
+			public function SetModelFormat():void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("SetModelFormat");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT, OnSetModelFormatFault);
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnSetModelFormatResult);
+				
+				op.send(m3DSPathFileName);
+			}
+			
+			private function OnSetModelFormatFault(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnSetModelFormatFault);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnSetModelFormatResult);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试.");	   
+			}			
+			
+			public function OnSetModelFormatResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,  OnSetModelFormatFault);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnSetModelFormatResult);
+				
+				var jsonStr:String = e.result.toString();
+				var jsonObj:Object = com.adobe.serialization.json.JSON.decode(jsonStr); 
+				
+			}
+			
+			public function OnShowImage():void
+			{
+				navigateToURL(new URLRequest( mIcon.source.toString()));
+			}
+			
+			public function OnClose():void
+			{
+				this.visible = false;
+			}
+			
+		]]>
+	</fx:Script>	
+	<fx:Declarations>
+		<mx:Blur id="blurOn" blurXFrom="0.0" blurXTo="10.0" blurYFrom="0.0" blurYTo="10.0"/>
+		<mx:Blur id="blurOut" blurXFrom="10.0" blurXTo="0.0" blurYFrom="10.0" blurYTo="0.0"/>	
+	</fx:Declarations>
+	<fx:Style>
+		Tree {
+		textAlign: left;
+		fontWeight: normal;
+		}
+	</fx:Style>	
+	<s:Rect x="-1000" y="-1000" width="5000" height="5000" alpha="0.5">
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>
+		
+	<s:Group left="0" right="0" top="0" bottom="0" >
+		<s:Group left="10" right="35" top="20" height="45" mouseDown="this.startDrag();" mouseUp="this.stopDrag()"/>	
+		<s:Rect right="20" top="20" left="10" bottom="8" radiusX="5">
+			<s:fill>
+				<s:SolidColor color="#ffffff"/>
+			</s:fill>		
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="8" blurY="8" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 		
+		</s:Rect>	
+		<s:Label x="424" y="141" fontFamily="宋体" fontSize="14" text="放置类型:"/>
+		
+		<s:Rect right="0" top="0" width="35" height="35" radiusX="45">
+			<s:stroke>
+				<s:SolidColorStroke color="#ffffff" caps="none" weight="3" joints="miter" miterLimit="4"/>
+			</s:stroke>	
+			<s:fill>
+				<s:SolidColor color="#000000"/>
+			</s:fill>
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="4" blurY="4" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 	
+		</s:Rect>
+		<s:Label left="20"  top="40"  fontFamily="宋体"  fontSize="36" text="上传模型文件"/>
+		<s:Rect right="33"  left="22" top="80">
+			<s:stroke>
+				<s:SolidColorStroke color="#dddddd" caps="none" weight="2" joints="miter" miterLimit="1"/>
+			</s:stroke>			
+		</s:Rect>
+		<s:Image right="8" top="10"  source="@Embed('/assets/close.png')" 
+				 mouseDownEffect="{blurOn}" mouseUpEffect="{blurOut}"
+				 buttonMode="true" click="OnClose();" />		
+
+		<s:Button x="580" bottom="48" width="110" height="23" id="selectFileButton" label="上传本地文件" 
+				  click="selectFile()" skinClass="Skins.CommonButton" fontFamily="宋体"/>
+		<s:Label x="418" y="104" fontFamily="宋体" fontSize="14" text="长:"/>
+		<s:Label x="483" y="104" fontFamily="宋体" fontSize="14" text="宽:"/>
+		<s:Label x="547" y="104" fontFamily="宋体" fontSize="14" text="高:"/>
+		<s:Label x="22"  y="104" fontFamily="宋体" fontSize="14" text="名称(只英文和数字)"/>
+		<s:Label x="61"  y="19" fontFamily="宋体" fontSize="14" text="保存的路径:" visible="false"/>
+		<s:Label id="mPriceText" x="295" y="44" fontFamily="宋体" fontSize="14" text="价 格:" visible="false"/>
+		<s:Label id="mPriceUnit" x="454" y="43" fontFamily="宋体" fontSize="14" text="元" visible="false"/>
+		<s:Label x="33"  y="510" fontFamily="宋体" fontSize="14" text="当前记录数:" id="mNumber"/>
+		<s:TextInput id="mName" x="147" y="100" width="110" change="OnNameChange(event)" fontFamily="宋体"
+					 fontSize="15"  tabIndex="1"/>
+		<s:Label x="263"  y="104" fontFamily="宋体" fontSize="14" text="中文名称:"/>
+		<s:TextInput id="mModelName" x="327" y="100" width="84"  fontFamily="宋体"
+					 fontSize="15"  tabIndex="2"/>
+		<s:TextInput id="mPrice" x="346" y="38" width="100" fontFamily="宋体" fontSize="15"
+					 restrict="0-9." visible="false"/>
+		<s:TextInput id="mLength" x="440" y="100" width="40" height="25" fontFamily="宋体"
+					 fontSize="15" restrict="0-9" tabIndex="3"/>
+		<s:TextInput id="mWidth" x="505" y="100" width="40" height="25" fontFamily="宋体" fontSize="15"
+					 restrict="0-9" tabIndex="4"/>
+		<s:TextInput id="mHeight" x="568" y="100" width="40" height="25" fontFamily="宋体"
+					 fontSize="15" restrict="0-9" tabIndex="5"/>
+		<s:DropDownList id="mType" x="495" y="137" width="111" height="23"
+						change="OnChangeType(event)" dataProvider="{TypeGroup}" fontFamily="宋体"
+						fontSize="15" tabIndex="7"/>
+		<s:Label x="22" y="142" fontFamily="宋体" fontSize="14" text="分 类:"/>
+
+		<s:RadioButton id="mBtn0" top="177" left="25" width="120" height="23" label="素材库" fontFamily="宋体" click="OnChangeTab(1);"
+					   fontSize="15" fontStyle="normal" fontWeight="normal" skinClass="Skins.CommonRadioButton" selected="true" />
+		<s:RadioButton id="mBtn1" top="177" left="146" width="120" height="23" label="渲染库" fontFamily="宋体" click="OnChangeTab(2);"
+					   fontSize="15" fontStyle="normal" fontWeight="normal" skinClass="Skins.CommonRadioButton"/>			
+		<s:RadioButton id="mBtn2" top="177" left="267" width="120" height="23" label="属性" fontFamily="宋体" click="OnChangeTab(3);"
+					   fontSize="15" fontStyle="normal" fontWeight="normal" skinClass="Skins.CommonRadioButton"/>	
+		
+		<s:List id="mList3D" dataProvider="{RenderGroup}" itemRenderer="Skins.BudgetRenderer" 
+				click="OnList3D(event);" left="25" top="209" right="35"  bottom="94" verticalScrollPolicy="on" />	
+	
+		<s:List id="mListVR" dataProvider="{VRGroup}" itemRenderer="Skins.VRRenderer" visible="false"
+				click="" left="25" top="209" right="35"  bottom="94" verticalScrollPolicy="on" />	
+		
+		<s:Image id="mIcon" x="614" y="91" width="100" height="100"  doubleClickEnabled="true" doubleClick="OnShowImage()"/>	
+		<mx:PopUpButton id="mClass" x="69" y="138" width="342" height="23" label="选择分类..."
+						fontFamily="宋体" fontSize="15" tabIndex="6">
+			<mx:popUp>
+				<mx:Tree id="mTree" width="200" height="260" borderVisible="true"
+						 change="OnChange(event);" dataProvider="" 
+						 fontFamily="宋体" fontSize="15" labelField="@Name" textAlign="left" borderStyle="solid" >						
+				</mx:Tree>	
+			</mx:popUp>
+		</mx:PopUpButton>
+		<s:Button x="307" y="538" width="120" height="26" label="确定" skinClass="Skins.CommonButton" click="OnOK();"/>
+		<s:Button x="327" y="36" width="60" height="22" label="测试唯一" skinClass="Skins.CommonButton" click="CheckName();" visible="false"/>
+		<s:TextInput id="mPathText" x="147" y="15" width="498" editable="false" tabIndex="8" visible="false"/>
+		<s:Group id="mGroupAttribute" left="25" top="209" right="35"  bottom="94">
+			<s:TextArea id="mTextAttribute" left="1" top="5" right="5" bottom="44"  fontFamily="宋体" fontSize="14" restrict="^,#~" tabIndex="9"/>
+			<s:Label id="mLabelAttribute" left="5" bottom="5" right="20" color="#ff0000"  fontFamily="宋体" fontSize="14"
+					 text="说明：输入属性内容，例如一个空调模型有品牌、颜色、规格、尺寸,则输入以下内容：格力白色柜式200X300X1000,这里可以根据模型信息输入任意与模型相关信息，主要目的方便前端查找。"/>
+		</s:Group>
+	</s:Group>	
+</s:Group>

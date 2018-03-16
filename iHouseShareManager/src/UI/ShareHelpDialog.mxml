@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 width="360" height="120" mouseDown="this.startDrag();" mouseUp="this.stopDrag()">
+	<fx:Script>
+		<![CDATA[	
+			public var m_iHouse:iHouseShareManager;
+			public function show(str:String):void
+			{
+				mHelp.text = str
+				this.visible = true;				
+			}
+			public function OnClose():void
+			{
+				this.visible = false;
+			}
+		]]>
+	</fx:Script>
+	<s:Rect x="-4000" y="-4000" width="8000" height="8000" alpha="0.5">
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>	
+	<s:Rect left="0" right="0" top="1" bottom="0" radiusX="5">
+		<s:fill>
+			<s:SolidColor color="#eeeeee"/>
+		</s:fill>
+		<s:filters>
+			<s:DropShadowFilter alpha="0.5" angle="45.0" blurX="8" blurY="8" color="#000000"
+								distance="8" hideObject="false" inner="false" knockout="false"
+								quality="2" strength="1"/>
+		</s:filters>
+	</s:Rect>
+	<s:Button id="mBtn" x="145" y="80" height="26" label="关闭" fontFamily="宋体" fontSize="14" fontWeight="normal" click="OnClose();"/>
+	<s:Label x="29" y="22" width="301" height="50" color="#000000" fontFamily="宋体" fontSize="14"
+			 text="标签" textAlign="center" verticalAlign="middle" id="mHelp"/>
+</s:Group>

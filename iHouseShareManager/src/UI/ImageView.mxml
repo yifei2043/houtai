@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 xmlns:local="*" 
+		 xmlns:UI="UI.*">
+	
+	<fx:Script>
+		<![CDATA[				
+			import mx.collections.ArrayCollection;
+			import mx.collections.XMLListCollection;
+			import mx.controls.Alert;
+			import mx.events.ListEvent;
+			import mx.rpc.AbstractOperation;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+
+			
+			public var m_iHouse:iHouseShareManager;
+			public var m_bDownloadNow:Boolean = false;	
+			public var m_dataXML:XML;
+			public var m_loaderXML:URLLoader  = new URLLoader();
+			public var ImageGroup:ArrayCollection = new ArrayCollection();
+			public var SceneGroup:ArrayCollection = new ArrayCollection();
+			public var m_strFolder:String = "/savefile/demo";		// 初始方案文件夹
+			
+			[Bindable] private var nav:Navigator;
+			
+			public function init() : void
+			{
+				mQRCodeDlg.init(m_iHouse);		
+				
+				//deleteButton tileList  Skins.MySpaceListItemRenderer
+				//tileList.itemRenderer;				
+			}
+			
+			private function treeClick(e:MouseEvent):void
+			{
+				
+			}
+			
+			public function downloadImage( ):void
+			{
+				if( m_bDownloadNow == true )
+				{
+					m_loaderXML.removeEventListener(Event.COMPLETE,loadCompleteXML);
+					m_loaderXML.close();
+				}				
+				
+				if(SceneGroup.length <=0 )
+					return;
+				
+				var strHttp:String = m_iHouse.mDataProcess.webserviceAddr +"users/share/" + m_iHouse.mStrFolder+ "/savefile/"+m_strPath+"/data.xml";
+				m_bDownloadNow = true;
+				var times:Date = new Date;
+				m_loaderXML.addEventListener(Event.COMPLETE,loadCompleteXML);
+				m_loaderXML.addEventListener(IOErrorEvent.IO_ERROR,OnErrorTex);
+				m_loaderXML.load(new URLRequest(strHttp+"?"+String(times.milliseconds)));
+			}   
+			
+			private function OnErrorTex(event:IOErrorEvent):void
+			{
+				m_loaderXML.removeEventListener(IOErrorEvent.IO_ERROR,OnErrorTex);
+				m_loaderXML.removeEventListener(Event.COMPLETE,loadCompleteXML);
+				//m_iHouse.mHelpDialog.show("读取data.xml失败.");
+			}
+			
+			public function loadCompleteXML(e:Event):void 
+			{
+				m_loaderXML.removeEventListener(IOErrorEvent.IO_ERROR,OnErrorTex);
+				m_loaderXML.removeEventListener(Event.COMPLETE,loadCompleteXML);
+				m_dataXML = XML(e.target.data.toString());
+				
+				var node:XMLListCollection = new XMLListCollection(m_dataXML.bmp);	
+				ImageGroup.removeAll();
+				var strTmp:String;
+
+				for(var i:int = node.length-1; i>=0; i-- )
+				{
+					strTmp = m_iHouse.mDataProcess.webserviceAddr +"users/share/" + m_iHouse.mStrFolder+ "/savefile/"+m_strPath+"//"+node[i].@Name;
+					ImageGroup.addItem({thumbnailImage:strTmp, gParent:this, dataXML:node[i], selected:false, mWidth:100, mHeight:100});
+				}
+				
+				mCount.text = "效果图总计: "+String(node.length);
+
+				m_bDownloadNow = false;
+			}
+			
+			
+			public function UpdateDB():void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("GetInfoFromShare");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnErrorShare);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnResultShare);
+				op.send();
+			}			
+
+			private function OnErrorShare(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnErrorShare);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResultShare);
+				m_iHouse.mHelpDialog.show("打开共享库错误.");	 
+			}			
+			
+			public function OnResultShare(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnErrorShare);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResultShare);
+				
+				var times:Date = new Date;
+				//	m_dataXML = XML(e.target.data.toString());
+				var str:String = e.result.toString();
+				var infoArray:Array = str.split("#")
+				
+				m_dataXML= new XML(<root></root>); // XML根节点
+				
+				for( var i:int = 1;i<infoArray.length; i++ )  
+				{
+					var strRecordArray:Array = infoArray[i].split("~");
+					
+					m_dataXML.appendChild(new XML(<scene Name ={strRecordArray[0]} Folder={strRecordArray[1]} User={strRecordArray[2]} />));
+				}
+				
+				var node:XMLListCollection = new XMLListCollection(m_dataXML.scene);
+				
+				var strTmp:String;
+				var strFolder:String;
+				var strFile:String;
+				for(var i:int = 0; i<node.length; i++ )
+				{
+					strTmp    = m_iHouse.mDataProcess.webserviceAddr + "users/share/chenx/savefile/"+node[i].@Folder+"/data_icon.jpg"+"?"+String(times.milliseconds);
+					strFile   = m_iHouse.mDataProcess.webserviceAddr + "users/share/chenx/savefile/"+node[i].@Folder+"/data_scene.xml";
+					
+					strFolder = "share";
+					
+					SceneGroup.addItem({title:node[i].@Name, file:strFile, thumbnailImage:strTmp, 
+						                folder:strFolder, handle:node[i], gParent:this,editable:m_iHouse.mbEditable});
+				}
+				
+				if( SceneGroup.length > 0) 
+				{
+					totalCount = SceneGroup.length;
+					totalPage = (totalCount + pageCount -1)/pageCount;
+					
+					inputpage.minimum=1; 
+					inputpage.maximum= totalPage; 
+					
+					setPager(0);  
+				}
+				else
+				{
+					totalCount 	= 0;
+					totalPage 	= 0;
+					curPage 	= 0;
+					inputpage.minimum= 0;
+					inputpage.maximum= 0;
+					pagedetail.text = "第 0 页/共 0 页 共 0 条记录";  
+				}	
+			}	
+			
+			public var m_sceneXML:XML;
+			public var m_loaderSceneXML:URLLoader  = new URLLoader();			
+			public function UpdateProject():void
+			{
+				SceneGroup.removeAll();
+				
+				UpdateDB();
+			}
+			
+			public function loadCompleteScene(e:Event):void 
+			{
+				
+				var times:Date = new Date;
+				m_loaderSceneXML.removeEventListener(Event.COMPLETE,loadCompleteScene);
+				m_sceneXML = XML(e.target.data.toString());
+				
+				var node:XMLListCollection = new XMLListCollection(m_sceneXML.scene);
+				
+				var strTmp:String;
+				var strFolder:String;
+				var strFile:String;
+				for(var i:int = 0; i<node.length; i++ )
+				{
+					strTmp    = m_iHouse.mDataProcess.webserviceAddr +"/users/"+ m_iHouse.mStrFolder+"/"+m_iHouse.mUserName  +"/savefile/"+node[i].@Folder+"/data_icon.jpg"+"?"+String(times.milliseconds);
+					strFile   = m_iHouse.mDataProcess.webserviceAddr +"/users/"+ m_iHouse.mStrFolder+"/"+m_iHouse.mUserName  +"/savefile/"+node[i].@Folder+"/data_scene.xml";
+					strFolder = "/savefile/"+node[i].@Folder;
+								
+					SceneGroup.addItem({title:node[i].@Name, file:strFile, thumbnailImage:strTmp, 
+						                folder:strFolder, handle:node[i], gParent:this,editable:m_iHouse.mbEditable});
+				}
+				
+				if( SceneGroup.length > 0) 
+				{
+					totalCount = SceneGroup.length;
+					totalPage = (totalCount + pageCount -1)/pageCount;
+					
+					inputpage.minimum=1; 
+					inputpage.maximum= totalPage; 
+					
+					setPager(0);  
+				}
+				else
+				{
+					totalCount 	= 0;
+					totalPage 	= 0;
+					curPage 	= 0;
+					inputpage.minimum= 0;
+					inputpage.maximum= 0;
+					pagedetail.text = "第 0 页/共 0 页 共 0 条记录";  
+				}	
+			}			
+	
+			public function OnQRcode():void
+			{
+				mQRCodeDlg.OnUpdate();
+				mQRCodeDlg.visible = true;
+			}
+			
+			private var m_strPath:String;
+			protected function tileList_doubleClickHandler(event:MouseEvent):void
+			{
+				
+				if( tileList.selectedIndex < 0)
+					return;
+				
+				m_strPath = SceneGroup[tileList.selectedIndex].handle.@Folder;
+				downloadImage();
+			}
+			
+			/***
+			 * 删除场景
+			 * 
+			 */
+			private var m_data:Object;
+			public function deleteScene(data1:Object):void
+			{
+				if(m_iHouse.mStrAdministrator == "1")
+				{
+					m_data = data1;
+					m_iHouse.mYesNoDialog.mYes.label = "确定";  
+					m_iHouse.mYesNoDialog.mNo.label  = "取消";
+					m_iHouse.mYesNoDialog.show("是否删除",OnNewFile_Yes,OnNewFile_No);	
+				}
+				else
+				{
+					m_iHouse.mYesNoDialog.show("非管理员，禁止删除!",OnNewFile_No,OnNewFile_No);
+				}
+			}	
+			
+			public function OnNewFile_No():void
+			{			
+			}   
+			
+			public function OnNewFile_Yes():void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("DeleteShare");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnErrorDel);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnDeleteShare);
+				op.send(m_data.@Folder);				
+			}			
+			
+			private function OnErrorDel(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnErrorDel);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnDeleteShare);
+				m_iHouse.mHelpDialog.show("删除共享错误.");	 
+			}			
+			
+			public function OnDeleteShare(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnErrorDel);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnDeleteShare);
+				m_iHouse.mHelpDialog.show("删除成功.");	
+				
+				UpdateProject();  
+			} 
+			
+			public var curPage:int; 		// 当前页码
+			public var totalPage:int;  	// 总页数 
+			public var totalCount:int; 	// 总记录条数 
+			public var pageCount:int = 18;	// 每页包含的记录数，默认6条 
+			private var mypagedata:ArrayCollection = new ArrayCollection();
+			public function setPager(value:int):void              
+			{                  
+				if(value <0 || (value+1)>totalPage)
+				{                      
+					return;  
+				}                  
+				curPage = value;                 		 // 计算跳转到页面中的第一条记录所在记录中是第几条记录       
+				var curNum : int = value*pageCount;      // 清空当前显示的数据记录 
+				
+				mypagedata.removeAll();
+				for(var i:int = 0; curNum<SceneGroup.length&&i<pageCount; i++,curNum++)
+				{                      
+					mypagedata.addItem(SceneGroup.getItemAt(curNum));  
+				}                  
+				var temp:int=curPage+1;                  
+				pagedetail.text = "第"+temp+"页/共"+totalPage+"页 共"+totalCount+"条记录";
+				
+				tileList.dataProvider = mypagedata;	
+				
+				inputpage.value = temp;				
+			}
+
+		]]>
+	</fx:Script>	
+	<s:Rect left="1" bottom="54" right="1" height="2">
+		<s:fill>
+			<s:SolidColor color="#000000"/>
+		</s:fill>
+	</s:Rect>	
+	
+	<s:Rect left="1" bottom="0" right="1" height="54" >
+		<s:fill>
+			<s:SolidColor color="#191B21"/>
+		</s:fill>
+	</s:Rect>	
+	<s:Group id="mGroup2" left="300" bottom="13" width="410" color="#FFFFFF" fontFamily="宋体"
+			 fontSize="16">
+		<mx:LinkButton x="0"  y="0" width="60" label="首页" click="setPager(0);"/>
+		<mx:LinkButton x="70" y="0" width="60" label="上页" click="setPager(curPage - 1);"/>         
+		<mx:LinkButton x="140" y="0" width="60" label="下页" click="setPager(curPage + 1);" textAlign="left"/>         
+		<mx:LinkButton x="210" y="0" label="末页" click="setPager(totalPage - 1);"/>          		        
+		<mx:NumericStepper id="inputpage" x="280" y="0" width="60" height="25" color="#000000" maximum="0" minimum="0" stepSize="1"/> 		
+		<mx:LinkButton x="350" y="0" width="60" label="跳转" click="setPager(inputpage.value - 1);"/>  
+	</s:Group>
+	<mx:Label id="pagedetail" left="30" bottom="15" color="#FFFFFF" fontFamily="宋体" fontSize="16" text="第 0 页/共 0 页"/>
+	<s:List  right="0" top="0" left="0" bottom="56" id="tileList" skinClass="Skins.HouseListSkin" dataProvider="{SceneGroup}" doubleClickEnabled="true"
+			itemRenderer="Skins.MySpaceListItemRenderer" doubleClick="tileList_doubleClickHandler(event)" />	
+  
+	<s:Label id="mCount" right="30" bottom="20" width="120" color="#FFFFFF" fontFamily="宋体"
+			 fontSize="15"/>
+	
+	<s:Button visible="false" right="340" bottom="10" width="120" label="生成二维码" buttonMode="true"
+			  click="OnQRcode();" enabled="false" skinClass="Skins.NormalCreateBtnSkin"/>	
+	<s:Button visible="false" right="200" bottom="10" width="120" label="新增加" buttonMode="true"
+			  click="" enabled="false" skinClass="Skins.NormalCreateBtnSkin"/>
+	
+	<local:QRCodeDlg id="mQRCodeDlg" x="{(this.width-mQRCodeDlg.width)/2}" y="{(this.height-mQRCodeDlg.height-48)/2}" visible="false"  />
+	
+
+</s:Group>

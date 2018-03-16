@@ -1,0 +1,706 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 xmlns:local="*" 
+		 xmlns:UI="UI.*">
+	
+	<fx:Script>
+		<![CDATA[	
+			import com.adobe.serialization.json.*;
+			import com.adobe.utils.StringUtil;
+			
+			import flash.display3D.IndexBuffer3D;
+			
+			import flashx.textLayout.elements.BreakElement;
+			import flashx.textLayout.formats.Direction;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.XMLListCollection;
+			import mx.controls.Alert;
+			import mx.events.ListEvent;
+			import mx.rpc.AbstractOperation;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.utils.StringUtil;
+			
+			public var m_iHouse:iHouseSchemeManager;
+			public var m_bDownloadNow:Boolean = false;	
+			public var m_dataXML:XML;
+			public var m_loaderXML:URLLoader  = new URLLoader();
+			
+			public var mGetUserScheme:Boolean = false;			
+			
+			
+			//用户方案对应路径  [用户帐号,scene:Array[{schemeName:strSchemeName,schemeDir:strSchemeDir}]
+			//var dicScheme:Dictionary = new Dictionary();
+			
+			//树控件上显示的数据,公司名称+用户名称   mDicTreeData[公司ID]=dicScheme
+			public var mDicTreeData:Dictionary = new Dictionary();
+			
+			//用户所有方案
+			public var SceneGroup:ArrayCollection = new ArrayCollection();
+			
+			//保存公司信息
+			public var CompanyGroup:ArrayCollection   =new ArrayCollection();
+			
+			//加入到树控件xml数据
+			public var strXMLData:String = "";
+			
+			public function OnRest():void
+			{
+				mDicTreeData   = new Dictionary();
+				CompanyGroup   =new ArrayCollection();
+				SceneGroup.removeAll();
+				
+				mUserAccountTree.dataProvider = null;
+				mList.dataProvider = null;
+				
+				strXMLData = "";
+			}
+			
+			public function GetCompanyScheme():void
+			{
+				if(CompanyGroup.length > 0)
+				{
+					GetUserScheme(CompanyGroup[0].CompanyID); 
+					CompanyGroup.removeItemAt(0);
+				}
+				//可能出错需要的加上结束的标志
+				else
+				{
+					if( -1 == strXMLData.indexOf("</root>") )
+					{
+						strXMLData += "</root>";
+						var xmdData:XML =new XML(strXMLData);
+						mUserAccountTree.dataProvider = new XMLList(xmdData.Class);	
+					}
+				}
+			}
+
+			//获取所有公司下面的用户方案
+			public function GetAllCompanyScheme():void
+			{
+				OnRest();
+				
+				CompanyGroup = mx.utils.ObjectUtil.copy(m_iHouse.mDataProcess.mCompanyGroup) as ArrayCollection;
+				
+				if(CompanyGroup.length > 0)
+				{
+					strXMLData = "<root>";
+					GetCompanyScheme();
+				}
+			}
+			
+			//获取指定公司下所有用户方案
+			public function GetUserScheme(strCompanyID:String):void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("GetAllUserScene");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnSchemeError);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnSchemeResult);
+
+				op.send(strCompanyID); 
+			}
+			
+			private function OnSchemeError(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnSchemeError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnSchemeResult);
+				m_iHouse.mHelpDialog.show("获取存在方案用户错误");	 
+			}			
+			
+			//取得存在方案用户的帐号加入到Tree
+			public function OnSchemeResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnSchemeError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnSchemeResult);
+				
+				var jsonStr:String = e.result.toString();
+				var jsonObj:Object = com.adobe.serialization.json.JSON.decode(jsonStr); 
+				
+				var objCompanyInfo:Object = m_iHouse.mDataProcess.GetCompanyInfo(jsonObj.companyID);
+				
+				//成功
+				if("1" == jsonObj.success)
+				{
+					var strSceneData:String = jsonObj.sceneData;
+					var strCompanyID:String = objCompanyInfo.CompanyID;
+					var strCompanyFolder:String = objCompanyInfo.Folder;
+
+					var schemeArr:Array = strSceneData.split("#");
+					
+					var dicScheme:Dictionary = new Dictionary();
+					
+					for(var index:uint = 1; index < schemeArr.length; ++index)
+					{
+						var sceneArr:Array = schemeArr[index].split("~");
+						var userName:String = sceneArr[0];
+						
+						var arr:Array = new Array();
+						
+						for(var sceneIndex:uint = 1; sceneIndex < sceneArr.length; ++sceneIndex)
+						{
+							var strSchemeName:String  = sceneArr[sceneIndex]  ; //方案名称
+							var strSchemeDir:String   = sceneArr[++sceneIndex]; //保存方案目录
+							var strCustoerName:String = sceneArr[++sceneIndex]; //客户名称
+							var strAddress:String     = sceneArr[++sceneIndex]; //地址
+							var strArea:String        = sceneArr[++sceneIndex]; //面积
+							var strStyle:String       = sceneArr[++sceneIndex]; //风格
+							var strDate:String        = sceneArr[++sceneIndex]; //创建时间
+							var strDesc:String        = sceneArr[++sceneIndex]; //描述
+							
+							arr.push({schemeName:strSchemeName,schemeDir:strSchemeDir,custoerName:strCustoerName,
+								      address:strAddress,area:strArea,style:strStyle,date:strDate,desc:strDesc});	
+						} 
+						
+						dicScheme[userName] = arr;
+					}
+					
+					mDicTreeData[strCompanyID] = dicScheme;
+					
+					//将所有方案的用户帐号加入到树
+					SetUserInfoToTree(objCompanyInfo,dicScheme);
+				}
+				else
+				{
+					GetCompanyScheme();
+				}
+			}
+			
+			//加入到树控件
+			public function SetUserInfoToTree(objCompanyInfo:Object,schemeInfo:Dictionary):void
+			{
+				strXMLData += "<Class userName=\"" + objCompanyInfo.CompanyName + 
+								"\"" + " companyID=\"" + objCompanyInfo.CompanyID + 
+								"\"" + " userNode=\"" + 0 + 
+								"\""+ " companyFolder=\"" + objCompanyInfo.Folder +"\">\r\n"; 
+
+				for(var userName:String in schemeInfo)
+				{
+					strXMLData += "<Class userName=\"" + userName + 
+									"\"" + " companyID=\"" + objCompanyInfo.CompanyID + 
+									"\"" + " userNode=\"" + 1 + 
+									"\""+ " companyFolder=\"" + objCompanyInfo.Folder +"\"/>\r\n"; 
+				}
+
+				strXMLData += "</Class>"
+				
+				//继续加入公司信息(由于异常原因无法使用一个循环获取，所以这样操作)
+				if(CompanyGroup.length > 0)
+				{
+					GetCompanyScheme();
+				}
+				else
+				{
+					strXMLData += "</root>";
+						
+					var xmdData:XML =new XML(strXMLData);
+					mUserAccountTree.dataProvider = new XMLList(xmdData.Class);	
+				}
+			}
+			
+			public function LoadUserScheme(strUserName:String,strCompanyID:String,strCompanyFolder:String):void
+			{
+				if(null == mDicTreeData.hasOwnProperty(strCompanyID))
+					return;
+
+				if(mDicTreeData.hasOwnProperty(strCompanyID) && mDicTreeData[strCompanyID].hasOwnProperty(strUserName) )
+				{
+					var sceneArr:Array = mDicTreeData[strCompanyID][strUserName];			
+					
+					for(var index:uint = 0; index < sceneArr.length; ++index)
+					{
+						var strSceneName:String  = sceneArr[index].schemeName;  //方案名称
+						var strSceneDir:String   = sceneArr[index].schemeDir;    //保存方案目录
+						var strCustoerName:String = sceneArr[index].custoerName; //客户名称
+						var strAddress:String     = sceneArr[index].address;     //地址
+						var strArea:String        = sceneArr[index].area;        //面积
+						var strStyle:String       = sceneArr[index].style;       //风格
+						var strDate:String        = sceneArr[index].date;        //创建时间
+						var strDesc:String        = sceneArr[index].desc;        //描述
+						
+						//完整图片路径
+						var httpPic:String = m_iHouse.mDataProcess.webserviceAddr + "users/" + strCompanyFolder+ "/" + strUserName + "/savefile/" + strSceneDir +"/data_icon.jpg";
+						var strSchemePath:String = "users/" + strCompanyFolder+ "/" + strUserName + "/savefile/" + "scene.xml";
+						
+						//是否显示界面按钮
+						var bEditAble:Boolean = ("临时" == strSceneName) ? false : m_iHouse.mbEditable;
+						
+						SceneGroup.addItem({title:strSceneName, thumbnailImage:httpPic,editable:bEditAble,
+							                handle:{ userName:strUserName,
+													 sceneXMLPath:strSchemePath,
+													 sceneDir:strSceneDir,
+													 sceneName:strSceneName,
+													 custoerName:strCustoerName,
+													 address:strAddress,
+													 area:strArea,
+													 style:strStyle,
+													 date:strDate,
+													 desc:strDesc,
+											         companyID:strCompanyID},											
+											gParent:this});										
+					}
+					
+					if( SceneGroup.length > 0) 
+					{
+						totalCount = SceneGroup.length;
+						totalPage = (totalCount + pageCount -1)/pageCount;
+						
+						inputpage.minimum=1; 
+						inputpage.maximum= totalPage; 
+						
+						setPager(0);  
+					}
+					else
+					{
+						totalCount 	= 0;
+						totalPage 	= 0;
+						curPage 	= 0;
+						inputpage.minimum= 0;
+						inputpage.maximum= 0;
+						pagedetail.text = "第 0 页/共 0 页 共 0 条记录";  
+					}	
+				}
+			}		
+			
+			//加载所有用户方案
+			public function LoadAllUserScheme(strCompanyID:String,strCompanyFolder:String):void
+			{				
+				if(null == mDicTreeData.hasOwnProperty(strCompanyID))
+				   return;
+				
+				SceneGroup.removeAll();
+
+				//取得指定公司下所有用户帐号
+				for(var strUserName in mDicTreeData[strCompanyID])
+				{
+					if(null == mDicTreeData[strCompanyID].hasOwnProperty(strUserName))
+						continue;
+					
+					var sceneArr:Array = mDicTreeData[strCompanyID][strUserName];					
+					
+					//获取用户帐号下方案
+					for(var index:uint = 0; index < sceneArr.length; ++index)
+					{
+						var strSceneName:String   = sceneArr[index].schemeName;  //方案名称
+						var strSceneDir:String    = sceneArr[index].schemeDir;    //保存方案目录
+						var strCustoerName:String = sceneArr[index].custoerName; //客户名称
+						var strAddress:String     = sceneArr[index].address;     //地址
+						var strArea:String        = sceneArr[index].area;        //面积
+						var strStyle:String       = sceneArr[index].style;       //风格
+						var strDate:String        = sceneArr[index].date;        //创建时间
+						var strDesc:String        = sceneArr[index].desc;        //描述
+						
+						//完整图片路径
+						var httpPic:String = m_iHouse.mDataProcess.webserviceAddr + "users/" + strCompanyFolder+ "/" + strUserName + "/savefile/" + strSceneDir +"/data_icon.jpg";
+						var strSchemePath:String = "users/" + strCompanyFolder+ "/" + strUserName + "/savefile/" + "scene.xml";
+						
+						//是否显示界面按钮
+						var bEditAble:Boolean = ("临时" == strSceneName) ? false : m_iHouse.mbEditable;
+						
+						SceneGroup.addItem({title:strSceneName, thumbnailImage:httpPic,editable:bEditAble,
+											handle:{ userName:strUserName,
+													 sceneXMLPath:strSchemePath,
+													 sceneDir:strSceneDir,
+													 sceneName:strSceneName,
+													 custoerName:strCustoerName,
+													 address:strAddress,
+													 area:strArea,
+													 style:strStyle,
+													 date:strDate,
+													 desc:strDesc,
+													 companyID:strCompanyID},											
+							               gParent:this});	
+					}
+				}
+				
+				if( SceneGroup.length > 0) 
+				{
+					totalCount = SceneGroup.length;
+					totalPage = (totalCount + pageCount -1)/pageCount;
+					
+					inputpage.minimum=1; 
+					inputpage.maximum= totalPage; 
+					
+					setPager(0);  
+				}
+				else
+				{
+					totalCount 	= 0;
+					totalPage 	= 0;
+					curPage 	= 0;
+					inputpage.minimum= 0;
+					inputpage.maximum= 0;
+					pagedetail.text = "第 0 页/共 0 页 共 0 条记录";  
+				}	
+			}	
+			
+			//点击树节点，显示对应用户下方案
+			public function OnChange(event:ListEvent):void			
+			{
+				var selectedNode:XML= Tree(event.target).selectedItem as XML; 
+				
+				//清除原来界面数据
+				SceneGroup.removeAll();
+				mList.dataProvider = SceneGroup;
+				
+				if(null == selectedNode)
+				{
+					return;
+				}
+				
+				var strUserNode:String = selectedNode.@userNode;
+				var strUserName:String = selectedNode.@userName;
+				var strCompanyID:String = selectedNode.@companyID;
+				var strCompanyFolder:String = selectedNode.@companyFolder;
+				
+				//公司节点
+				if("0" == strUserNode)
+					LoadAllUserScheme(strCompanyID,strCompanyFolder);
+				//用户节点
+				else if("1" == strUserNode)
+				{
+					mCurrentSelectUser = strUserName;
+					LoadUserScheme(strUserName,strCompanyID,strCompanyFolder);
+				}
+			}
+			
+
+			private var m_strPath:String;
+			protected function tileList_doubleClickHandler(event:MouseEvent):void
+			{
+				
+
+			}
+			
+			/***
+			 * 删除场景
+			 * 
+			 */
+			private var objSceneInfo:Object;
+			public function deleteScene(sceneInfo:Object):void
+			{
+				if(m_iHouse.mStrAdministrator == "1")
+				{
+					objSceneInfo = sceneInfo;
+					m_iHouse.mYesNoDialog.mYes.label = "OK";  
+					m_iHouse.mYesNoDialog.mNo.label  = "Cancel";
+					m_iHouse.mYesNoDialog.show("是否删除",OnNewFile_Yes,OnNewFile_No);	
+				}
+				else
+				{
+					m_iHouse.mYesNoDialog.show("非管理员，禁止删除!",OnNewFile_No,OnNewFile_No);
+				}			
+			}	
+			
+			public var scenePicPath:String = "";
+			public function ShowScenePicture(sceneInfo:Object):void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("GetScenePicture");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnGetScenePictureError);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnGetScenePictureRes);
+				
+				var xmlPath:String = sceneInfo.sceneXMLPath;
+				scenePicPath = sceneInfo.sceneDir;
+				
+				op.send(xmlPath,   //场景路径  users\chenx\chenx\savefile\33745FB6-8582-C441-832B-553A05B0BD04
+					    scenePicPath); //场景中的目录data.xml中的Name
+			}
+	
+			private function OnGetScenePictureError(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnGetScenePictureError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnGetScenePictureRes);
+				m_iHouse.mHelpDialog.show("获取方案中图片错误");	 
+			}						
+			
+			public function OnGetScenePictureRes(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnGetScenePictureError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnGetScenePictureRes);
+				
+				var strPicData:String = e.result.toString();
+				if("0" == strPicData)
+				{
+					m_iHouse.mHelpDialog.show("获取方案中图片数据异常");
+				}
+				else if("" != strPicData)
+				{
+					m_iHouse.mScenePictureView.SetPicData(strPicData,scenePicPath);
+					m_iHouse.mScenePictureView.visible=true;
+				}
+			}
+			
+			
+			public function OnNewFile_No():void
+			{			
+			}   
+
+			//更新界面数据
+			public function OnRefreshScene(strCompanyID:String):void
+			{				
+				for(var index:uint = 0; index < SceneGroup.length; ++index)
+				{
+					var obj:Object = SceneGroup[index];
+					
+					if(obj.handle.sceneXMLPath == objSceneInfo.sceneXMLPath &&
+					   obj.handle.sceneDir == objSceneInfo.sceneDir &&
+					   obj.handle.sceneName == objSceneInfo.sceneName )
+					{
+						//删除当前界面如何
+						SceneGroup.removeItemAt(index);		
+						mList.dataProvider = SceneGroup;
+						
+						//从总的数据中删除
+						var strUserName:String = obj.handle.userName;	
+						
+						if(mDicTreeData.hasOwnProperty(strCompanyID) && 
+						   mDicTreeData[strCompanyID].hasOwnProperty(strUserName))
+						{
+							var sceneArr:Array = mDicTreeData[strCompanyID][strUserName];	
+							
+							for(var dicIndex:uint = 0; dicIndex < sceneArr.length; ++dicIndex)
+							{
+								var strSceneName:String = sceneArr[dicIndex].schemeName;
+								var strSceneDir:String  = sceneArr[dicIndex].schemeDir;
+								
+								if(obj.handle.sceneDir == strSceneDir && obj.handle.sceneName == strSceneName)
+									sceneArr.splice(dicIndex,1);						
+							}
+						}
+						
+						break;
+					}						
+				}								
+			}
+			
+			public function OnNewFile_Yes():void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("DeleteUserScheme");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnErrorDel);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnDeleteShare);
+				
+				var xmlPath:String = objSceneInfo.sceneXMLPath;
+				var sceneName:String = objSceneInfo.sceneName;
+				var sceneDir:String = objSceneInfo.sceneDir;
+				
+				op.send(objSceneInfo.companyID,   //公司id
+					    xmlPath,                  //场景路径  users\chenx\test\savefile(类似)
+					    sceneName,                //场景名称 xml中的Name
+					    sceneDir);                //场景中的目录xml中的Folder
+			}			
+			
+			private function OnErrorDel(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnErrorDel);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnDeleteShare);
+				m_iHouse.mHelpDialog.show("删除共享错误.");	 
+			}			
+			
+			public function OnDeleteShare(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnErrorDel);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnDeleteShare);
+				
+				var jsonStr:String = e.result.toString();
+				var jsonObj:Object = com.adobe.serialization.json.JSON.decode(jsonStr); 
+				
+				//成功
+				if("1" == jsonObj.success)
+				{
+					OnRefreshScene(jsonObj.companyID);
+				}
+				
+				m_iHouse.mAlertDialog.show(jsonObj.nofityMsg);
+			} 
+			
+			
+			//给其它好友共享方案
+			public var mShareUserScheme:String = ""; //给指定好友共享方案
+			public var mCurrentSelectUser:String = ""; //点击树节点时的用户名
+			public function ShowShareUser(sceneInfo:Object):void
+			{
+				if(m_iHouse.mStrAdministrator != "1")
+				{
+					m_iHouse.mYesNoDialog.show("非管理员，禁止共享!",OnNewFile_No,OnNewFile_No);
+					return;
+				}
+				
+				mShareUserScheme ="<root><share username='{0}' scenexmlpath='{1}' scenedir='{2}' scenename='{3}' " +
+					              "custoerName='{4}' address='{5}' area='{6}' style='{7}' date='{8}' desc='{9}' companyID='{10}' />";
+				
+				mShareUserScheme = mx.utils.StringUtil.substitute(mShareUserScheme,
+																  sceneInfo.userName,
+																  sceneInfo.sceneXMLPath,				
+																  sceneInfo.sceneDir,
+																  sceneInfo.sceneName,
+																  sceneInfo.custoerName,
+																  sceneInfo.address,				
+																  sceneInfo.area,
+																  sceneInfo.style,
+																  sceneInfo.date,
+																  sceneInfo.desc,				
+																  sceneInfo.companyID);
+				
+				mUserCheckList.OnResetCheck();
+				mUserCheckList.SetCompanyList(m_iHouse);
+				mUserCheckList.visible = true;
+			}
+			
+			public function ShareScheme(strCompanyID:String):void
+			{
+				var strTemp:String = "";
+				
+				 for each(var obj:Object in mUserCheckList.mUserProvider)
+				 {
+					 if(true == obj.check && obj.userName != mCurrentSelectUser)
+					 {
+						 strTemp += "<item username='" +  obj.userName + "' folder='" + obj.folder+"' />";
+					 }
+				 }
+				 
+				 if("" != strTemp)
+				 {
+					 mShareUserScheme += strTemp;
+					 mShareUserScheme += "</root>"; 
+					 
+					 //后台处理相关操作
+					 var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("ShareUserScheme");
+					 m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnShareUserSchemeError);
+					 m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnShareUserSchemeRes);
+
+					 op.send(mShareUserScheme,strCompanyID); 
+				 }
+			}
+			
+			private function OnShareUserSchemeError(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnShareUserSchemeError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnShareUserSchemeRes);
+				m_iHouse.mHelpDialog.show("共享方案失败");	 
+			}						
+			
+			public function OnShareUserSchemeRes(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnGetScenePictureError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnShareUserSchemeRes);
+				
+				var jsonStr:String = e.result.toString();
+				var jsonObj:Object = com.adobe.serialization.json.JSON.decode(jsonStr); 
+				
+				//成功
+				if("1" == jsonObj.success)
+				{
+					var strCompanyID = jsonObj.companyID;
+					UpdateUserScheme(strCompanyID);
+				}
+				
+				m_iHouse.mHelpDialog.show(jsonObj.nofityMsg);
+			}
+			
+			//更新用户方案
+			public function UpdateUserScheme(strCompanyID:String):void
+			{
+				try
+				{
+					var xmlData:XML = XML(mShareUserScheme);
+					
+					var strSchemeDir:String = xmlData.share.@scenedir;
+					var strSceneName:String = xmlData.share.@scenename;
+					
+					for each(var tItem:XML in xmlData.item)
+					{
+						var strUserName:String = tItem.@username;
+						if(mDicTreeData.hasOwnProperty(strCompanyID) && mDicTreeData[strCompanyID].hasOwnProperty(strUserName))
+						{
+							var sceneArr:Array = mDicTreeData[strCompanyID][strUserName]; 
+							
+							//如果已经共享过
+							var bFind:Boolean = false;
+							
+							for each(var sceneObj:Object in sceneArr)
+							{
+								if(sceneObj.schemeDir == strSchemeDir)
+								{
+									bFind = true;
+									break;
+								}
+							}
+							
+							if(!bFind)
+								sceneArr.push({schemeDir:strSchemeDir,schemeName:strSceneName});
+						}
+					}
+				} 
+				catch(error:Error) 
+				{
+					trace(error.message);
+				}
+			}
+			
+			public var curPage:int; 		// 当前页码
+			public var totalPage:int;  	// 总页数 
+			public var totalCount:int; 	// 总记录条数 
+			public var pageCount:int = 15;	// 每页包含的记录数，默认6条 
+			private var mypagedata:ArrayCollection = new ArrayCollection();
+			public function setPager(value:int):void              
+			{                  
+				if(value <0 || (value+1)>totalPage)
+				{                      
+					return;  
+				}                  
+				curPage = value;                 		 // 计算跳转到页面中的第一条记录所在记录中是第几条记录       
+				var curNum : int = value*pageCount;      // 清空当前显示的数据记录 
+				
+				mypagedata.removeAll();
+				for(var i:int = 0; curNum<SceneGroup.length&&i<pageCount; i++,curNum++)
+				{                      
+					mypagedata.addItem(SceneGroup.getItemAt(curNum));  
+				}                  
+				var temp:int=curPage+1;                  
+				pagedetail.text = "第"+temp+"页/共"+totalPage+"页 共"+totalCount+"条记录";
+				
+				mList.dataProvider = mypagedata;	
+				
+				inputpage.value = temp;				
+			}	
+			
+			public function ShowSchemeInfo(sceneInfo:Object):void
+			{
+				m_iHouse.mSchemeDialog.SetSchemeData(sceneInfo);
+			}
+			
+
+		]]>
+	</fx:Script>	
+	<s:Rect left="1" bottom="54" right="1" height="2">
+		<s:fill>
+			<s:SolidColor color="#000000"/>
+		</s:fill>
+	</s:Rect>	
+	
+	<s:Rect left="1" bottom="0" right="1" height="54" >
+		<s:fill>
+			<s:SolidColor color="#191B21"/>
+		</s:fill>
+	</s:Rect>	
+	<s:Group id="mGroup2" left="300" bottom="13" width="410" color="#FFFFFF" fontFamily="宋体"
+			 fontSize="16">
+		<mx:LinkButton x="0"  y="0" width="60" label="首页" click="setPager(0);"/>
+		<mx:LinkButton x="70" y="0" width="60" label="上页" click="setPager(curPage - 1);"/>         
+		<mx:LinkButton x="140" y="0" width="60" label="下页" click="setPager(curPage + 1);" textAlign="left"/>         
+		<mx:LinkButton x="210" y="0" label="末页" click="setPager(totalPage - 1);"/>          		        
+		<mx:NumericStepper id="inputpage" x="280" y="0" width="60" height="25" color="#000000" maximum="0" minimum="0" stepSize="1"/> 		
+		<mx:LinkButton x="350" y="0" width="60" label="跳转" click="setPager(inputpage.value - 1);"/>  
+	</s:Group>
+	<mx:Label id="pagedetail" left="30" bottom="15" color="#FFFFFF" fontFamily="宋体" fontSize="16" text="第 0 页/共 0 页"/>
+	<s:List id="mList" right="0" top="0" left="150" bottom="56" skinClass="Skins.HouseListSkin" dataProvider="{SceneGroup}" doubleClickEnabled="true"
+			itemRenderer="Skins.SceneListItemRenderer" doubleClick="tileList_doubleClickHandler(event)" />	
+  
+	<s:Label id="mCount" right="30" bottom="20" width="120" color="#FFFFFF" fontFamily="宋体"
+			 fontSize="15"/>
+
+	<mx:Tree id="mUserAccountTree" left="5" top="5" bottom="60" width="150" labelField="@userName" defaultLeafIcon="@Embed(source='../assets/UserAccout.png')" change="OnChange(event);" ></mx:Tree>
+	<UI:UserCheckList id="mUserCheckList" mSchemeView="{this}" horizontalCenter="0" verticalCenter="0"  visible="false"/>
+
+</s:Group>

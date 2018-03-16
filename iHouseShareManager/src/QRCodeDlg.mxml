@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="750" height="550" >
+	
+	<fx:Script>
+		<![CDATA[				
+			import com.google.zxing.BarcodeFormat;
+			import com.google.zxing.MultiFormatWriter;
+			import com.google.zxing.common.ByteMatrix;
+			
+			import flash.display.Bitmap;
+			import flash.display.BitmapData;
+			import flash.display.MovieClip;
+			import flash.display.Sprite;
+			import flash.events.Event;
+			import flash.events.MouseEvent;
+			import flash.text.TextField;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			
+			import utils.JPGEncoder1;
+			
+			public var m_iHouse:iHouseShareManager;
+			public function init(_iHouseData:iHouseShareManager):void
+			{	
+				m_iHouse = _iHouseData;
+			}  
+	
+			public  function OnClose():void
+			{
+				this.visible = false;
+			}	
+
+			public var ImageGroup:ArrayCollection   =new ArrayCollection();
+			public function OnUpdate():void
+			{
+				ImageGroup.removeAll();
+				for(var i:int =0; i<m_iHouse.mImageView.ImageGroup.length; i++ )
+				{
+					if( m_iHouse.mImageView.ImageGroup[i].selected == true )
+					{
+						if( int(m_iHouse.mImageView.ImageGroup[i].mWidth) == 1536 && int(m_iHouse.mImageView.ImageGroup[i].mHeight) == 2048 )	//  360度全景
+						{
+							var m_strPath360:String = m_iHouse.mImageView.ImageGroup[i].thumbnailImage;
+							var j:int = m_strPath360.lastIndexOf(".");
+							var strPathWeb:String = m_strPath360.slice(0,j);
+							strPathWeb+="/iHouse.html";							
+							
+							ImageGroup.addItem({thumbnailImage:strPathWeb, type:"360", desc:"", str360:strPathWeb});
+							
+						}
+						else
+							ImageGroup.addItem({thumbnailImage:m_iHouse.mImageView.ImageGroup[i].thumbnailImage, type:false, desc:""});
+					}
+				}
+				
+				if( ImageGroup.length == 0)
+				{
+					m_iHouse.mHelpDialog.show("请选择图片");
+					return;
+				}
+				
+				txt.text =ImageGroup[0].thumbnailImage;
+				
+				txt.text = txt.text.split("//").join("/");
+				txt.text = txt.text.split("http:/").join("http://");				
+			}
+			public function GenerateQR():void
+			{ 
+				
+				if( ImageGroup.length == 0)
+				{
+					m_iHouse.mHelpDialog.show("请选择图片");
+					this.visible = false;
+					return;
+				}
+				
+				var textString:String = txt.text;
+				var matrix:ByteMatrix;
+				var qrEncoder:MultiFormatWriter = new MultiFormatWriter();
+				try
+				{
+					matrix = (qrEncoder.encode(textString,BarcodeFormat.QR_CODE,250,250)) as ByteMatrix;
+				}
+				catch (e:Error)
+				{
+					m_iHouse.mHelpDialog.show("请选择图片"); 
+					return;
+				}
+				var bmd:BitmapData = new BitmapData(250, 250, false, 0x808080);
+				for (var h:int = 0; h < 250; h++)
+				{
+					for (var w:int = 0; w < 250; w++)
+					{
+						if (matrix._get(w, h) == 0)
+						{
+							bmd.setPixel(w, h, 0x000000);
+						}
+						else
+						{
+							bmd.setPixel(w, h, 0xFFFFFF);
+						}        
+					}
+				}
+
+				mQRImage.source=new Bitmap(bmd);
+			}
+			
+			public function DownloadQR():void
+			{
+				var jpg:JPGEncoder1    = new JPGEncoder1(80);
+				var file:FileReference = new FileReference();				
+				var ba:ByteArray=jpg.encode(mQRImage.bitmapData);
+				file.save(ba,"rename.jpg"); 			
+			}
+		]]>
+	</fx:Script>	
+	<fx:Declarations>
+		<mx:Blur id="blurOn" blurXFrom="0.0" blurXTo="10.0" blurYFrom="0.0" blurYTo="10.0"/>
+		<mx:Blur id="blurOut" blurXFrom="10.0" blurXTo="0.0" blurYFrom="10.0" blurYTo="0.0"/>
+	</fx:Declarations>
+	
+	<s:Rect x="-1000" y="-1000" width="5000" height="5000" alpha="0.5">
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>
+		
+	<s:Group left="0" right="0" top="0" bottom="0" >
+		<s:Group left="10" right="35" top="20" height="45" mouseDown="this.startDrag();" mouseUp="this.stopDrag()"/>	
+		<s:Rect right="20" top="20" left="10" bottom="8" radiusX="5">
+			<s:fill>
+				<s:SolidColor color="#ffffff"/>
+			</s:fill>		
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="8" blurY="8" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 		
+		</s:Rect>	
+		<s:Rect right="0" top="0" width="35" height="35" radiusX="45">
+			<s:stroke>
+				<s:SolidColorStroke color="#ffffff" caps="none" weight="3" joints="miter" miterLimit="4"/>
+			</s:stroke>	
+			<s:fill>
+				<s:SolidColor color="#000000"/>
+			</s:fill>
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="4" blurY="4" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 	
+		</s:Rect>
+		<s:Label left="20"  top="47" fontFamily="Times New Roman" fontSize="36" text="QR code"/>
+		<s:Rect right="33"  left="22" top="90">
+			<s:stroke>
+				<s:SolidColorStroke color="#dddddd" caps="none" weight="2" joints="miter" miterLimit="1"/>
+			</s:stroke>			
+		</s:Rect>
+		<s:Image right="8" top="10"  source="@Embed('/assets/close.png')" 
+				 mouseDownEffect="{blurOn}" mouseUpEffect="{blurOut}"
+				 buttonMode="true" click="OnClose();" />		
+		<s:Button x="390" bottom="30" width="100" height="30" label="生成二维码" 	click="GenerateQR();" skinClass="Skins.CommonButton" />		
+		<s:Button x="500" bottom="30" width="100" height="30" label="下载二维码图片" click="DownloadQR();" skinClass="Skins.CommonButton" />
+		<s:Button x="610" bottom="30" width="100" height="30" label="取消" 			click="OnClose();" skinClass="Skins.CommonButton" />
+	
+		<s:Rect right="33"  left="22" bottom="70">
+			<s:stroke>
+				<s:SolidColorStroke color="#dddddd" caps="none" weight="2" joints="miter" miterLimit="1"/>
+			</s:stroke>			
+		</s:Rect>
+		<s:TextInput id="txt" x="135" y="122" width="562" height="30" text="http://" editable="true"/>
+		<s:Label x="35" y="128" fontFamily="宋体" fontSize="17" text="被捆绑网址:"/>
+		<s:Rect x="239"  y="187" width="258" height="258">
+			<s:stroke>
+				<s:SolidColorStroke color="#555555" caps="none" weight="1" joints="miter" miterLimit="1"/>
+			</s:stroke>			
+		</s:Rect>
+		<s:Image id="mQRImage" x="240" y="188" width="256" height="256"/>
+	</s:Group>	
+
+
+
+  	
+</s:Group>

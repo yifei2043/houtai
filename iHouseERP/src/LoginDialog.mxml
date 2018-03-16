@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="430" height="250">
+	<fx:Script>
+		<![CDATA[	
+			import com.adobe.crypto.MD5;
+			
+			import mx.controls.Alert;
+			import mx.rpc.AbstractOperation;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.utils.UIDUtil;
+			
+			public  var m_iHouse:iHouseERP;
+			public  var mYesFunc:Function;
+			public  var mNoFunc:Function;
+			
+			public var m_strUUID:String;
+			public var m_strUser:String;
+			public var m_strIP:String;
+			
+			public function show():void
+			{
+				mHelpText.text   ="";  
+				mHttpText.text = m_iHouse.m_strHttp;
+				
+				mLoginText.tabIndex = 1;
+				mLoginPSW.tabIndex  = 2;
+				mHttpText.tabIndex  = 3;
+				
+				this.visible = true;
+			}
+			
+			public function AutoLogin(userName:String,userPassword:String):void
+			{
+				this.visible = false; 
+				mHttpText.text  = m_iHouse.m_strHttp;
+				mLoginText.text = userName;
+				mLoginPSW.text  = userPassword;
+				
+				OnOK();
+			}
+			
+			public function OnClose():void
+			{				
+			}
+			
+			public function OnOK():void
+			{
+				if( mLoginPSW.text.length == 0 )
+				{
+					mHelpText.text = "用户名不能为空";
+					return;
+				}
+				
+				if( mLoginPSW.text.length == 0 )
+				{
+					mLoginPSW.text = "密码不能为空";
+					return;
+				}
+				
+				//加载web服务
+				
+				//*/
+				if(m_iHouse.m_bAutoLogin)
+					OnAutoLogin(m_iHouse.mLoginDialog.mLoginText.text,m_iHouse.mLoginDialog.mLoginPSW.text);
+				else
+					OnLogin(m_iHouse.mLoginDialog.mLoginText.text,m_iHouse.mLoginDialog.mLoginPSW.text);
+				//*/
+				
+                /* /				
+				var md5_password:String = com.adobe.crypto.MD5.hash(m_iHouse.mLoginDialog.mLoginPSW.text);
+				
+				if(m_iHouse.m_bAutoLogin)
+					OnAutoLogin(m_iHouse.mLoginDialog.mLoginText.text,md5_password);
+				else
+					OnLogin(m_iHouse.mLoginDialog.mLoginText.text,md5_password); 
+				//*/
+			}
+			
+			public function OnLogin(strName:String,strPSW:String):void
+			{
+				m_strIP = ExternalInterface.call("GetIP") as String;
+				m_strUUID = UIDUtil.createUID();
+				m_strUser = strName;
+				var op:AbstractOperation = m_iHouse.m_webService.mWebService1.getOperation("Login");
+				m_iHouse.m_webService.mWebService1.addEventListener(FaultEvent.FAULT, OnErrorLogin);
+				m_iHouse.m_webService.mWebService1.addEventListener(ResultEvent.RESULT,OnLoginResult);
+				op.send(strName,strPSW,m_strUUID,m_strIP);		
+			}
+			
+			public function OnAutoLogin(strName:String,strPSW:String):void
+			{
+				m_strIP = ExternalInterface.call("GetIP") as String;
+				m_strUUID =  UIDUtil.createUID();
+				m_strUser = strName;
+				var op:AbstractOperation = m_iHouse.m_webService.mWebService1.getOperation("AutoLogin");
+				m_iHouse.m_webService.mWebService1.addEventListener(FaultEvent.FAULT, OnErrorLogin);
+				m_iHouse.m_webService.mWebService1.addEventListener(ResultEvent.RESULT,OnLoginResult);
+				op.send(strName,strPSW,m_strUUID,m_strIP);		
+			}
+			
+			public function ValidateEmbedWeb(strEmbedWeb:String):Boolean
+			{
+				var strOriginIP:String = m_iHouse.parameters.http;
+				var strLoginWeb:String = ExternalInterface.call("function getUrlParams(){return window.location.href;}"); 
+				
+				if(-1 == strLoginWeb.indexOf(strOriginIP))
+				{
+					return false;
+				}
+				
+				return true;
+			}
+			
+			private var m_Timer:Timer=new Timer(30000, 0);
+			public function OnLoginResult(e:ResultEvent):void
+			{
+				m_iHouse.m_webService.mWebService1.removeEventListener(FaultEvent.FAULT,OnErrorLogin);
+				m_iHouse.m_webService.mWebService1.removeEventListener(ResultEvent.RESULT,OnLoginResult);
+				var str:String = e.result.toString();
+				var strArray:Array = str.split("~");
+				
+				if( strArray[0] == "1" )
+				{	
+					var strTime:String = strArray[5];	
+					var tempArr1:Array = strTime.split("-");
+					var Year:Number = Number(tempArr1[0]);
+					var Moon:Number = Number(tempArr1[1]);  
+					var Day:Number  = Number(tempArr1[2]);
+					var StarTim:Number = Number(new Date(Year,Moon,Day,0,0,0));					
+					
+					
+					var nowTim:String = strArray[6];
+					var tempArr2:Array = nowTim.split("-");
+					var nowYear:Number = Number(tempArr2[0]);
+					var nowMoon:Number = Number(tempArr2[1]);
+					var nowDay:Number  = Number(tempArr2[2]);
+					
+					var StartTime:Number	= StarTim / 1000;
+					var EndTime:Number 	 	= Math.floor((Number(new Date(nowYear,nowMoon,nowDay,0,0,0))/1000));
+					var JobTime:Number 		= StartTime - EndTime;
+					var JobDay:Number 		= Math.floor(JobTime / 86400);
+					
+					if( JobDay<= 0 )  
+					{
+						mHelpText.text = "用户名已过期";
+						return;
+					}
+					
+					/*
+					//1:允许嵌入登录
+					var strEmbedWeb:String = strArray[10];
+					
+					//判断如果是第三方嵌入并且有权限可以登录
+					if(false == ValidateEmbedWeb(strEmbedWeb))
+					{
+						mHelpText.text = "您使用了嵌入方式并且没有权限，禁止登录!";
+						return;
+					}
+					*/
+					
+					//=================================================================================
+					m_iHouse.m_strSysUser  = strArray[1];
+					m_iHouse.m_strFolder   = strArray[2];
+					m_iHouse.m_strCompanyID= strArray[5];
+					m_iHouse.mLoginDialog.visible = false;	
+					m_iHouse.m_strAdministrator = strArray[4];
+					m_iHouse.m_StrUserID = strArray[8];
+					m_iHouse.m_StrAccountType = strArray[9];
+						
+					m_Timer.addEventListener(TimerEvent.TIMER, OnTime); // 侦听时间
+					m_Timer.start();
+						
+					m_iHouse.mUser.text="当前用户："+m_strUser;					
+
+					//成功登录 
+                    m_iHouse.OnLoginSuccess();
+				}
+				else
+				{
+					mHelpText.text = "用户名密码错误";				
+				} 
+			}	
+			
+			private function OnErrorLogin(e:FaultEvent):void
+			{
+				m_iHouse.m_webService.mWebService1.removeEventListener(FaultEvent.FAULT,OnErrorLogin);
+				m_iHouse.m_webService.mWebService1.removeEventListener(ResultEvent.RESULT,OnLoginResult);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试.");	 
+			}
+				
+			private function OnTime(event:Event):void
+			{				
+				OnCheckLogin();
+			}	
+			
+			public function OnCheckLogin():void
+			{
+				var op:AbstractOperation = m_iHouse.m_webService.mWebService2.getOperation("CheckLogin");
+				m_iHouse.m_webService.mWebService2.addEventListener(FaultEvent.FAULT,  OnError);
+				m_iHouse.m_webService.mWebService2.addEventListener(ResultEvent.RESULT,OnResult);
+				op.send(m_strUser,m_strUUID); 
+			}
+			
+			public function OnResult(e:ResultEvent):void
+			{
+				m_iHouse.m_webService.mWebService2.removeEventListener(FaultEvent.FAULT,  OnError);
+				m_iHouse.m_webService.mWebService2.removeEventListener(ResultEvent.RESULT,OnResult);
+				
+				var str:String = e.result.toString();
+				if( str == "false" )
+				{
+					m_Timer.removeEventListener(TimerEvent.TIMER, OnTime);
+					m_Timer.stop();	
+					m_iHouse.mHelpDialog.show("帐号被登录，强制下线。");
+				} 
+			}
+			
+			private function OnError(e:FaultEvent):void
+			{
+				m_iHouse.m_webService.mWebService2.removeEventListener(FaultEvent.FAULT,OnError);
+				m_iHouse.m_webService.mWebService2.removeEventListener(ResultEvent.RESULT,OnResult);
+			}	
+			
+		]]>
+	</fx:Script>
+	<s:Rect x="-1000" y="-1000" width="5000" height="5000" alpha="1">
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>
+	
+	<s:Rect left="0" right="0" top="0" bottom="0" radiusX="0">
+		<s:fill>
+			<s:SolidColor color="#eeeeee"/>
+		</s:fill>
+		<s:filters>
+			<s:DropShadowFilter alpha="0.5" angle="45.0" blurX="8" blurY="8" color="#000000"
+								distance="8" hideObject="false" inner="false" knockout="false"
+								quality="2" strength="1"/>
+		</s:filters>
+	</s:Rect>
+	<s:Group x="0" y="0" width="100%" mouseDown="this.startDrag();" mouseUp="this.stopDrag()">
+		<s:Rect x="0" y="0" width="100%" height="37" radiusX="5">
+			<s:fill>
+				<s:LinearGradient rotation="90">
+					<s:GradientEntry alpha="1.0" color="#474747" ratio="0"/>
+					<s:GradientEntry alpha="1.0" color="#303030" ratio="1"/>
+				</s:LinearGradient>
+			</s:fill>
+		</s:Rect>
+		<s:Rect x="0" y="18" width="100%" height="20" radiusX="0">
+			<s:fill>
+				<s:LinearGradient rotation="90">
+					<s:GradientEntry alpha="1.0" color="0x3B3B3B" ratio="0"/>
+					<s:GradientEntry alpha="1.0" color="#303030" ratio="1"/>
+				</s:LinearGradient>
+			</s:fill>			
+		</s:Rect>			
+		<s:RichText id="mLoginTitle" x="11" y="11" color="0xCCCCCC" fontFamily="宋体" fontSize="15"
+					fontWeight="bold" tabStops="S0 S50" text="-------------"/>
+		<s:Rect x="0" y="0" width="100%" height="20" alpha="0.5" radiusX="5" >
+			<s:fill>
+				<s:LinearGradient rotation="90">
+					<s:GradientEntry alpha="0.5" color="#FFFFFF" ratio="0"/>
+					<s:GradientEntry alpha="0.05" color="#FFFFFF" ratio="1"/>
+				</s:LinearGradient>
+			</s:fill>
+		</s:Rect>
+	</s:Group>
+	
+	<s:Button id="mYes" x="160" y="185" width="117" height="30" label="登录" 
+			  click="OnOK();" cornerRadius="15" focusColor="#70CFEE" fontFamily="宋体" fontSize="14" chromeColor="#bbbbbb"
+			  fontWeight="bold">
+		<s:filters>
+			<s:DropShadowFilter alpha="0.5" angle="45.0" blurX="5" blurY="5" color="#000000"
+								distance="8" hideObject="false" inner="false" knockout="false"
+								quality="2" strength="1"/>
+		</s:filters>
+		
+	</s:Button>		
+	<s:Label id="mHelp" x="60" y="101" width="75" height="26" color="#000000" fontFamily="宋体"
+			 fontSize="16" fontWeight="bold" text="用户名:" textAlign="center" verticalAlign="middle">
+		<s:filters>
+			<s:DropShadowFilter alpha="0.5" angle="45.0" blurX="5" blurY="5" color="#000000"
+								distance="8" hideObject="false" inner="false" knockout="false"
+								quality="2" strength="1"/>
+		</s:filters>
+		
+	</s:Label>
+	<s:Label id="mHelp1" x="8" y="52" width="75" height="26" color="#000000" fontFamily="宋体"
+			 fontSize="16" fontWeight="bold" text="服务器:" textAlign="center" verticalAlign="middle">
+		<s:filters>
+			<s:DropShadowFilter alpha="0.5" angle="45.0" blurX="5" blurY="5" color="#000000"
+								distance="8" hideObject="false" inner="false" knockout="false"
+								quality="2" strength="1"/>
+		</s:filters>
+		
+	</s:Label>
+	<s:Label id="mHelp0" x="60" y="143" width="75" height="26" color="#000000" fontFamily="宋体"
+			 fontSize="16" fontWeight="bold" text="密  码:" textAlign="center" verticalAlign="middle">
+		<s:filters>
+			<s:DropShadowFilter alpha="0.5" angle="45.0" blurX="5" blurY="5" color="#000000"
+								distance="8" hideObject="false" inner="false" knockout="false"
+								quality="2" strength="1"/>
+		</s:filters>
+	</s:Label>		
+	<s:TextInput id="mLoginText" x="147" y="99" width="180" height="30" fontFamily="宋体" fontSize="18">
+		<s:filters>
+			<s:DropShadowFilter alpha="0.5" angle="45.0" blurX="5" blurY="5" color="#000000"
+								distance="8" hideObject="false" inner="false" knockout="false"
+								quality="2" strength="1" />
+		</s:filters>
+	</s:TextInput>
+	<s:TextInput id="mHttpText" x="81" y="50" width="329" height="30" fontFamily="宋体" fontSize="18">
+		<s:filters>
+			<s:DropShadowFilter alpha="0.5" angle="45.0" blurX="5" blurY="5" color="#000000"
+								distance="8" hideObject="false" inner="false" knockout="false"
+								quality="2" strength="1"/>
+		</s:filters>
+	</s:TextInput>
+	<s:TextInput id="mLoginPSW" x="147" y="141" width="180" height="30" displayAsPassword="true"
+				 fontFamily="宋体" fontSize="14">
+		<s:filters>
+			<s:DropShadowFilter alpha="0.5" angle="45.0" blurX="5" blurY="5" color="#000000"
+								distance="8" hideObject="false" inner="false" knockout="false"
+								quality="2" strength="1"/>
+		</s:filters>
+	</s:TextInput>		
+	<s:Label id="mHelpText" left="10" right="10" width="340" bottom="5" color="#FF0000" fontFamily="宋体"
+			 text="" textAlign="left" verticalAlign="middle"/>
+</s:Group>

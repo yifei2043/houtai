@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="260" height="60" >
+	
+	<fx:Script>
+		<![CDATA[	
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.managers.PopUpManager;
+
+			public var m_iHouse:iHouseResourceManager;
+			public var m_bChild:Boolean = false;
+			public function OnCancel():void
+			{
+				this.visible = false;
+			}
+			public function show(bChild:Boolean):void
+			{			
+				m_bChild = bChild;
+				
+				if(m_bChild )
+					mTitle.text ="添加子分类:";
+				else
+					mTitle.text ="添加分类:";
+				
+				this.visible = true;
+			}
+			
+			public function OnAdd():void
+			{
+				if( m_iHouse.mDataView.visible == true )
+				{
+					if(m_bChild )
+						m_iHouse.mDataView.OnAddChildClass(mText.text);
+					else
+						m_iHouse.mDataView.OnAddClass(mText.text);
+				}
+				else
+				{
+					if(m_bChild )
+						m_iHouse.mDataMatView.OnAddChildClass(mText.text);
+					else
+						m_iHouse.mDataMatView.OnAddClass(mText.text);					
+				}
+				this.visible = false;
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<mx:Blur id="blurOn" blurXFrom="0.0" blurXTo="10.0" blurYFrom="0.0" blurYTo="10.0"/>
+		<mx:Blur id="blurOut" blurXFrom="10.0" blurXTo="0.0" blurYFrom="10.0" blurYTo="0.0"/>	
+	</fx:Declarations>	
+	<s:Rect left="8" top="10" right="10" bottom="8" radiusX="5" >
+		<s:fill>
+			<s:SolidColor alpha="1" color="#eeeeee" />		
+		</s:fill>
+		<s:stroke>
+			<s:SolidColorStroke alpha="1" caps="none" color="#888888" joints="miter" miterLimit="1" weight="1"/>
+		</s:stroke>
+		<s:filters>
+			<s:DropShadowFilter angle="0" blurX="8" blurY="8" color="#888888"
+								distance="0" hideObject="false" inner="false" knockout="false"
+								quality="2" strength="1"/>
+		</s:filters> 		
+	</s:Rect>
+	
+	<s:Rect right="0" top="0" width="20" height="20" radiusX="45">
+		<s:stroke>
+			<s:SolidColorStroke color="#ffffff" caps="none" weight="3" joints="miter" miterLimit="4"/>
+		</s:stroke>	
+		<s:fill>
+			<s:SolidColor color="#000000"/>
+		</s:fill>
+		<s:filters>
+			<s:DropShadowFilter angle="0" blurX="4" blurY="4" color="#888888"
+								distance="0" hideObject="false" inner="false" knockout="false"
+								quality="2" strength="1"/>
+		</s:filters> 	
+	</s:Rect>
+		
+	
+	<s:Image right="5" top="6"  source="@Embed('/assets/close.png')" scaleX="0.6" scaleY="0.6"
+			 mouseDownEffect="{blurOn}" mouseUpEffect="{blurOut}" smooth="true"
+			 buttonMode="true" click="this.visible = false;" />
+	
+	<s:Label id="mTitle" x="13" y="24" width="91" color="#141414" fontFamily="宋体" fontSize="15"
+			 text="增加子分类:" textAlign="center"/>
+	<s:TextInput id="mText" x="107" y="20" width="80" height="23" editable="true" fontSize="15"/>
+	<s:Button right="22" bottom="16" width="44" height="26" label="确定" click="OnAdd();"
+			  fontFamily="宋体" fontSize="15" skinClass="Skins.CommonButton"/>
+</s:Group>

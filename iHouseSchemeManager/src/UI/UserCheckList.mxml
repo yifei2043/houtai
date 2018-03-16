@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="400" height="450">
+	
+	<fx:Script>
+		<![CDATA[
+			import flash.display3D.IndexBuffer3D;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.CheckBox;
+			import mx.events.ListEvent;
+			import mx.rpc.AbstractOperation;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			public var m_iHouse:iHouseSchemeManager;
+			public var mSchemeView:SchemeView = null;			
+			public var mUserProvider:ArrayCollection = new ArrayCollection();
+			public var strCompanyID:String = "";
+			
+			
+			public function SetCompanyList(iHouse:iHouseSchemeManager):void
+			{
+				m_iHouse = iHouse;
+				
+				var strXMLData:String = "<root>";
+				
+				for(var index:uint = 0; index < m_iHouse.mDataProcess.mCompanyGroup.length; ++index)
+				{
+					var objItem:Object =  m_iHouse.mDataProcess.mCompanyGroup[index];
+				    strXMLData += "<Class companyName=\"" + objItem.CompanyName +"\"" + " folder=\"" + objItem.Folder +"\"" + " companyID=\"" +objItem.CompanyID + "\"/>\r\n";
+				}
+				
+				strXMLData += "</root>";
+				
+				var xmdData:XML =new XML(strXMLData);
+				mCompanyTree.dataProvider = new XMLList(xmdData.Class);
+			}
+			
+			protected function OnCancel(event:MouseEvent):void
+			{
+				visible = false;
+			}
+			
+			protected function OnOK(event:MouseEvent):void
+			{				
+				if(null != mSchemeView)
+				   mSchemeView.ShareScheme(strCompanyID);
+				
+				visible = false;
+			}
+			
+			protected function OnSelectAll(event:MouseEvent):void
+			{
+				mCheckReverse.selected = false;
+				
+				for each(var obj:Object in mUserProvider)
+				{
+					obj.check = mCheckAll.selected;
+					mUserProvider.itemUpdated(obj);	
+				}
+			}
+			
+			protected function OnSelectReverse(event:MouseEvent):void
+			{
+				mCheckAll.selected = false;
+				
+				for each(var obj:Object in mUserProvider)
+				{
+					obj.check = !obj.check;
+					mUserProvider.itemUpdated(obj);	
+				}
+			}
+			
+			public function OnResetCheck():void
+			{
+				for each(var obj:Object in mUserProvider)
+				{
+					obj.check = false;
+					mUserProvider.itemUpdated(obj);	
+				}
+			}
+			
+			public function OnTreeChange(event:ListEvent):void			
+			{
+				var selectedNode:XML= Tree(event.target).selectedItem as XML; 
+				
+				//清除原来界面数据
+				mUserProvider.removeAll();
+				mUserList.dataProvider = mUserProvider;
+				
+				if(null == selectedNode)
+				{
+					return;
+				}
+				
+				strCompanyID = selectedNode.@companyID;
+				GetUserList(strCompanyID);
+			}
+			
+			public function GetUserList(strCompanyID:String):void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("GetUserList");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnError);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnResult);
+				op.send(strCompanyID); 
+			}
+			
+			private function OnError(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResult);
+				m_iHouse.mAlertDialog.show("系统繁忙,请重试.");	 
+			}			
+			
+			public function OnResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResult);
+				
+				mUserProvider.removeAll();
+
+				var str:String = e.result.toString();
+				var strArray:Array = str.split("#");
+				
+				for( var i:int = 0;i<strArray.length; i++ )  
+				{
+					var strRecord:String = strArray[i];
+					var strRecordArray:Array = strRecord.split("~");
+					
+					if( strRecordArray[0] == "1" )
+						continue;
+
+					// 已逻辑删除账号
+					if( strRecordArray[5] == "2" )	
+						continue;
+					
+					mUserProvider.addItem({userName:strRecordArray[0],folder:strRecordArray[6], check:false});
+				}
+				
+				//更新界面
+				mUserList.dataProvider = mUserProvider;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<mx:Blur id="blurOn" blurXFrom="0.0" blurXTo="10.0" blurYFrom="0.0" blurYTo="10.0"/>
+		<mx:Blur id="blurOut" blurXFrom="10.0" blurXTo="0.0" blurYFrom="10.0" blurYTo="0.0"/>	
+	</fx:Declarations>
+	<s:Rect x="-1000" y="-1000" width="5000" height="5000" alpha="0.5">
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>
+	<s:Group left="0" right="0" top="0" bottom="0" >
+		<s:Rect right="5" top="5" left="5" bottom="5" radiusX="5">
+			<s:fill>
+				<s:SolidColor color="#ffffff"/>
+			</s:fill>		
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="8" blurY="8" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 		
+		</s:Rect>	
+		<s:Rect right="-6.5" top="-11.5" width="35" height="35" radiusX="45">
+			<s:stroke>
+				<s:SolidColorStroke color="#ffffff" caps="none" weight="3" joints="miter" miterLimit="4"/>
+			</s:stroke>	
+			<s:fill>
+				<s:SolidColor color="#000000"/>
+			</s:fill>
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="4" blurY="4" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 	
+		</s:Rect>	
+		
+		<s:Button right="146" bottom="11" width="70" height="30" label="确定" click="OnOK(event)"/>
+		<s:Button right="56" bottom="11" width="70" height="30" label="取消" click="OnCancel(event)"/>
+		
+		<s:List id="mUserList" left="146" top="112" right="10" bottom="56" skinClass="Skins.HouseListSkin" dataProvider="{mUserProvider}" 
+				itemRenderer="Skins.ListCheckItemRenderer"></s:List>
+		
+		<s:Image right="3" top="-3"  source="@Embed('/assets/close.png')" 
+				 mouseDownEffect="{blurOn}" mouseUpEffect="{blurOut}"
+				 buttonMode="true" click="this.visible=false;" />
+		
+		<s:Label left="23"  top="30" fontFamily="宋体" fontSize="20" text="选择用户"/>
+		<s:Group  left="15" right="42" top="10" height="50" mouseDown="this.startDrag();" mouseUp="this.stopDrag()"/>
+		<s:CheckBox id="mCheckAll" x="165" y="80" label="全选" click="OnSelectAll(event)"
+					fontFamily="宋体"/>
+		<s:CheckBox id="mCheckReverse" x="227" y="80" label="反选" click="OnSelectReverse(event)"
+					fontFamily="宋体"/>
+		<mx:Tree id="mCompanyTree" x="15" y="80" width="123" height="314" labelField="@companyName" change="OnTreeChange(event);"></mx:Tree>
+	</s:Group>
+	<s:Rect right="10"  left="10" top="65">
+		<s:stroke>
+			<s:SolidColorStroke color="#dddddd" caps="none" weight="2" joints="miter" miterLimit="1"/>
+		</s:stroke>			
+	</s:Rect>
+	<s:Rect right="10"  left="10" bottom="45">
+		<s:stroke>
+			<s:SolidColorStroke color="#dddddd" caps="none" weight="2" joints="miter" miterLimit="1"/>
+		</s:stroke>			
+	</s:Rect>
+</s:Group>

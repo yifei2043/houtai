@@ -1,0 +1,639 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 width="680" height="545"
+		 creationComplete="OnInit()">
+	
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.serialization.json.*;
+			import com.adobe.utils.StringUtil;
+			
+			import flashx.textLayout.elements.BreakElement;
+			
+			import mx.collections.ArrayCollection;
+			import mx.managers.CursorManager;
+			import mx.rpc.AbstractOperation;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+						
+			public var m_iHouse:iHouseUserManager;	
+			public var m_strCompanyID:String;			
+			public var mGroupNumber:ArrayCollection = new ArrayCollection(); 
+			
+			//登录前的图片数据
+			private var logoImageFile:FileReference;
+			private var logoImageByteArray:ByteArray;
+			private var logoBitmapData:BitmapData;
+			private var logoLoader:Loader=new Loader();
+			
+			//成功登录后左上角图标
+			private var titleImageFile:FileReference;
+			private var titleImageByteArray:ByteArray;
+			private var titleBitmapData:BitmapData;
+			
+			private var titleLoader:Loader=new Loader();
+			
+			public var m_bEmbedWeb:String = "0";
+			
+			public function OnReset():void
+			{
+				mTextName.text = "";
+				mTextAddr.text = "";
+				mTextTel.text = "";
+				mTextMobi.text = "";
+				mTextContacts.text = "";
+				mTextCreate.text = "";
+				mTextEMail.text = "";
+				
+				mTextWebName.text = "";
+				mCombo.selectedIndex = -1;
+				mLogoImage.source = null;
+				mTitleImage.source = null;
+				
+				logoImageByteArray = null;
+				titleImageByteArray = null;
+				mEmbedWeb.selected = false;
+				m_bEmbedWeb = "0";
+			}
+			
+			public function OnInit():void
+			{
+				mGroupNumber.addItem({UserNumber:"30"});
+				mGroupNumber.addItem({UserNumber:"50"});
+				mGroupNumber.addItem({UserNumber:"100"});
+				mGroupNumber.addItem({UserNumber:"200"});
+				mGroupNumber.addItem({UserNumber:"300"});
+				mGroupNumber.addItem({UserNumber:"不限制"});
+				
+				Security.allowDomain("*");
+				
+				logoImageFile=new FileReference();
+				logoImageFile.addEventListener(Event.COMPLETE, LogoImageCompleteHandler);
+				logoImageFile.addEventListener(Event.SELECT, LogoImageSelectHandler);
+				
+				titleImageFile=new FileReference();
+				titleImageFile.addEventListener(Event.COMPLETE, titleImageCompleteHandler);
+				titleImageFile.addEventListener(Event.SELECT, titleImageSelectHandler);
+			}
+			
+			//载入本地图片
+			private function LogoImageCompleteHandler(e:Event):void
+			{
+				mProgressBar.visible = false;
+				
+				logoImageByteArray=logoImageFile.data;
+				logoLoader.contentLoaderInfo.addEventListener(Event.COMPLETE, LogImageLoaderCompleteHandler);
+				logoLoader.loadBytes(logoImageByteArray);
+			}
+			
+			//选择文件动作监听
+			private function LogoImageSelectHandler(e:Event):void
+			{
+				mProgressBar.visible = true;
+				logoImageFile.removeEventListener(ProgressEvent.PROGRESS, onLogImageProgress);
+				logoImageFile.load();
+			}
+			
+			//图片载入完成显示在预览框中
+			private function LogImageLoaderCompleteHandler(e:Event):void
+			{
+				var bitmap:Bitmap=Bitmap(logoLoader.content);
+				logoBitmapData=bitmap.bitmapData;
+				mLogoImage.source=logoBitmapData;
+			}
+			
+			//监听文件上传状态
+			private function onLogImageProgress(e:ProgressEvent):void
+			{
+				var proc:uint=e.bytesLoaded / e.bytesTotal * 100;
+				mProgressBar.setProgress(proc, 100);
+				mProgressBar.label="当前进度: " + " " + proc + "%";
+				if (e.bytesLoaded == e.bytesTotal)
+				{
+					CursorManager.removeBusyCursor();
+				}
+			}
+			
+			//载入本地图片
+			private function titleImageCompleteHandler(e:Event):void
+			{
+				titleImageByteArray=titleImageFile.data;
+				titleLoader.contentLoaderInfo.addEventListener(Event.COMPLETE, titleImageLoaderCompleteHandler);
+				titleLoader.loadBytes(titleImageByteArray);
+			}
+			
+			//选择文件动作监听
+			private function titleImageSelectHandler(e:Event):void
+			{
+				mProgressBar0.visible = true;
+			    mTitleImage.removeEventListener(ProgressEvent.PROGRESS, onTitleImageProgress);
+				titleImageFile.load();
+			}
+			
+			//图片载入完成显示在预览框中
+			private function titleImageLoaderCompleteHandler(e:Event):void
+			{
+				mProgressBar0.visible = false;
+				
+				var bitmap:Bitmap=Bitmap(titleLoader.content);
+				titleBitmapData=bitmap.bitmapData;
+				mTitleImage.source=titleBitmapData;
+			}
+			
+			//监听文件上传状态
+			private function onTitleImageProgress(e:ProgressEvent):void
+			{
+				var proc:uint=e.bytesLoaded / e.bytesTotal * 100;
+				mProgressBar0.setProgress(proc, 100);
+				mProgressBar0.label="当前进度: " + " " + proc + "%";
+				if (e.bytesLoaded == e.bytesTotal)
+				{
+					CursorManager.removeBusyCursor();
+				}
+			}
+
+			//选择上传的图片
+			private function choose(uploadLogImage:Boolean):void
+			{
+				var imageTypes:FileFilter=new FileFilter("Images (*.jpg, *.jpeg, *.png)", "*.jpg;*.jpeg;*.png");
+				var allTypes:Array=new Array(imageTypes);
+				
+				if(uploadLogImage)
+				   logoImageFile.browse(allTypes);
+				else
+				   titleImageFile.browse(allTypes);	
+			}
+			
+			//查询
+			public function OnSetCompanyInfo(strCompanyID:String):void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("GetCompanyInfo");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnGetCompanyFault);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnGetCompanyResult);
+				op.send(strCompanyID);
+			}
+			
+			public function OnGetCompanyResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnGetCompanyFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnGetCompanyResult);
+				
+				var strResult:String = e.result.toString();
+				var strArray:Array = strResult.split("~");
+				if(strResult != "0" && strArray.length >=11 )
+				{
+					mTextName.text = strArray[0];
+					mTextAddr.text = strArray[6];
+					mTextTel.text = strArray[1];
+					mTextMobi.text = strArray[2];
+					mTextContacts.text = strArray[3];
+					mTextCreate.text = strArray[4];
+					mTextEMail.text = strArray[5];
+					mTextWebName.text = strArray[7];
+					
+					//网页登录界面图片
+					var logoImage:String = strArray[8];
+					mLogoImage.source = m_iHouse.mDataProcess.webserviceAddr + "ihouse/" + logoImage;
+					
+					//成功登录后，左上角图片
+					var titleImage:String = strArray[9];
+					mTitleImage.source = m_iHouse.mDataProcess.webserviceAddr + "ihouse/" + titleImage;
+					
+					//公司下最多可以创建用户数量
+					var strUserNumber:String = strArray[10];
+					
+					m_bEmbedWeb = strArray[11];
+					
+					mEmbedWeb.selected = ("1" == m_bEmbedWeb) ? true : false;
+
+					for(var index:int = 0; index < mGroupNumber.length; ++index)
+					{
+						if(mGroupNumber[index].UserNumber == strUserNumber)
+						{
+							mCombo.selectedIndex = index;
+							break;
+						}
+					}
+				}
+			}		
+			
+			public function OnGetCompanyFault(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnGetCompanyFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnGetCompanyResult);
+				m_iHouse.mDataProcess.m_iHouse.mHelpDialog.show("系统繁忙,请重试.");
+			}
+			
+			//数据校验
+			public function DataVerify():Boolean
+			{
+				if(mTextName.text == "")
+				{
+					m_iHouse.mAlertDialog.show("公司名称不能为空");
+					return false;
+				}
+				
+				if("" != mTextMobi.text && mTextMobi.text.length != 11)
+				{
+					m_iHouse.mAlertDialog.show("手机号码应为11位");
+					return false;
+				}
+				
+				if(mTextWebName.text == "")
+				{
+					m_iHouse.mAlertDialog.show("网页名称不能为空");
+					return false;
+				}
+				
+				if(null == mLogoImage.source)
+				{
+					m_iHouse.mAlertDialog.show("主页图片不能为空");
+					return false;
+				}
+				
+				if(null == mTitleImage.source)
+				{
+					m_iHouse.mAlertDialog.show("标题图片不能为空");
+					return false;
+				}
+				
+				if(-1 == mCombo.selectedIndex)
+				{
+					m_iHouse.mAlertDialog.show("请选择用户数量");
+					mCombo.setFocus();
+					return false;
+				}
+				
+				if("" != mTextEMail.text && false == validateEmail(mTextEMail.text))
+				{
+					m_iHouse.mAlertDialog.show("请输入正确的email地址格式");  
+					return false;
+				}
+					
+				return true;
+			}
+			
+			//新增			
+			protected function OnOK(event:MouseEvent):void
+			{
+				if(false == DataVerify())
+					return;
+				
+				//首先判断要生成的网页是否存在
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("HasExistCompanyPage");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnHasExistCompanyPageFault);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnHasExistCompanyPageResult);
+				
+				op.send(mTextWebName.text);
+			}
+			
+			public function OnHasExistCompanyPageResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnHasExistCompanyPageFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnHasExistCompanyPageResult);
+				
+				var jsonStr:String = e.result.toString();
+				var jsonObj:Object = com.adobe.serialization.json.JSON.decode(jsonStr); 
+				
+				//成功
+				if("1" == jsonObj.success)
+				{
+					if("0" != jsonObj.pageExists)
+					{
+						m_iHouse.mAlertDialog.show(mTextWebName.text + " 此网页名称已存在，请使用其它名称");
+						return;
+					}
+					
+					var index:int = mCombo.selectedIndex;				
+					var userNumber:String = mGroupNumber[index].UserNumber;
+					
+					//新增公司
+					var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("AddCompanyInfo");
+					m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnAddCompanyFault);
+					m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnAddCompanyResult);
+					
+					var webPage:String = mTextWebName.text;
+					if(-1 == webPage.indexOf(".html"))
+						webPage += ".html";
+					
+					op.send(mTextName.text,mTextTel.text,mTextMobi.text,mTextContacts.text,
+						    mTextCreate.text,mTextEMail.text,mTextAddr.text,
+							webPage,userNumber,
+							(new Date).time.toString() + "_"+ logoImageFile.name, //主页图片名称，确保唯一性
+							logoImageByteArray,        //主页图片数据
+							(new Date).time.toString() + "_" + titleImageFile.name, //成功登录后左上角图标，确保唯一性
+							titleImageByteArray,       //成功登录后左上角图标数据
+							m_bEmbedWeb                //是否允许嵌入前端编辑器   
+					        );
+				}
+				else
+				{
+					m_iHouse.mAlertDialog.show(jsonObj.nofityMsg);
+				}
+			}
+			
+			private function OnHasExistCompanyPageFault(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnHasExistCompanyPageFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnHasExistCompanyPageResult);
+				m_iHouse.mDataProcess.m_iHouse.mHelpDialog.show("系统繁忙,请重试.");				
+			}
+			
+			
+			public function OnAddCompanyResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnAddCompanyFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnAddCompanyResult);
+				
+				var jsonStr:String = e.result.toString();
+				var jsonObj:Object = com.adobe.serialization.json.JSON.decode(jsonStr); 
+				
+				//成功
+				if("1" == jsonObj.success)
+				{
+					visible = false;
+					
+					m_iHouse.mUserView.InsertCompanyInfo(jsonObj.companyID,jsonObj.companyName,jsonObj.companyFolder);
+					m_iHouse.mUserView.mRecordDialog.InsertCompanyInfo(jsonObj.companyID,jsonObj.companyName,jsonObj.companyFolder);
+				}
+				
+				m_iHouse.mAlertDialog.show(jsonObj.nofityMsg);
+				//m_iHouse.mAlertDialog.show(e.result.toString());
+			}
+						
+			private function OnAddCompanyFault(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnAddCompanyFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnAddCompanyResult);
+				m_iHouse.mDataProcess.m_iHouse.mHelpDialog.show("系统繁忙,请重试.");				
+			}
+			
+			//修改
+			protected function OnModify(event:MouseEvent):void
+			{
+				if(false == DataVerify())
+					return;
+				
+				var index:int = mCombo.selectedIndex;
+			    var strUserNumber:String = mGroupNumber[index].UserNumber;
+				
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("UpdateCompanyInfo");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnUpdateCompanyFault);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnUpdateCompanyResult);
+
+				var strLogoImageName:String = (logoImageByteArray == null) ? "" : (new Date).time.toString() + "_" + logoImageFile.name;
+				var strTitleImageName:String = (titleImageByteArray == null) ? "" : (new Date).time.toString() + "_" + titleImageFile.name;
+				
+				var webPage:String = mTextWebName.text;
+				if(-1 == webPage.indexOf(".html"))
+					webPage += ".html";
+				
+				op.send(m_strCompanyID,mTextName.text,mTextTel.text,mTextMobi.text,
+					    mTextContacts.text,mTextCreate.text,mTextEMail.text,mTextAddr.text,
+						webPage,strUserNumber,
+						strLogoImageName,logoImageByteArray,
+						strTitleImageName,titleImageByteArray,m_bEmbedWeb);
+			}
+			
+			public function OnUpdateCompanyResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnUpdateCompanyFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnUpdateCompanyResult);
+				
+				var jsonStr:String = e.result.toString();
+				var jsonObj:Object = com.adobe.serialization.json.JSON.decode(jsonStr); 
+				
+				//成功
+				if("1" == jsonObj.success)
+				{
+					m_iHouse.mUserView.ModifyCompanyInfo(jsonObj.companyID,jsonObj.companyName);
+					m_iHouse.mUserView.mRecordDialog.ModifyCompanyInfo(jsonObj.companyID,jsonObj.companyName);
+					visible = false;
+				}
+				
+				m_iHouse.mAlertDialog.show(jsonObj.nofityMsg);
+			}		
+			
+			private function OnUpdateCompanyFault(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnUpdateCompanyFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnUpdateCompanyResult);
+				m_iHouse.mDataProcess.m_iHouse.mHelpDialog.show("系统繁忙,请重试.");				
+			}
+			
+			public function OnDelete_No():void
+			{
+				
+			}
+			
+			public function OnDelete_Yes():void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("DeleteCompanyInfo");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnDeleteCompanyFault);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnDeleteCompanyResult);
+				op.send(gStrCompanyID);
+			}
+			
+			public var gStrCompanyID:String = "";
+			//删除
+			public function OnDelete(strCompanyID:String):void
+			{
+				gStrCompanyID = strCompanyID;
+				m_iHouse.mYesNoDialog.show("确定要删除吗?",OnDelete_Yes,OnDelete_No);
+			}
+			
+			public function OnDeleteCompanyResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnDeleteCompanyFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnDeleteCompanyResult);
+				
+				var jsonStr:String = e.result.toString();
+				var jsonObj:Object = com.adobe.serialization.json.JSON.decode(jsonStr); 
+				
+				//成功
+				if("1" == jsonObj.success)
+				{
+					m_iHouse.mUserView.RemoveCompanyInfo(jsonObj.companyID);
+					m_iHouse.mUserView.mRecordDialog.RemoveCompanyInfo(jsonObj.companyID);
+				}
+				
+				m_iHouse.mAlertDialog.show(jsonObj.nofityMsg);
+			}		
+			
+			private function OnDeleteCompanyFault(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnDeleteCompanyFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnDeleteCompanyResult);
+				m_iHouse.mDataProcess.m_iHouse.mHelpDialog.show("系统繁忙,请重试.");				
+			}
+			
+			protected function OnCancel(event:MouseEvent):void
+			{
+				visible = false;
+			}
+			
+			//strType: "0" 新增   "1" 修改
+			public function OnShowDialog(strType:String,strCompanyID:String):void
+			{
+				OnReset();
+				visible = true;
+				
+				mAdd.visible = false;
+				mModify.visible = false;	
+				mWeb.visible = false;
+				
+				if("0" == strType)
+				{
+					mAdd.visible = true;
+				}
+				else if("1" == strType)
+				{
+					m_strCompanyID = strCompanyID;
+					OnSetCompanyInfo(strCompanyID);
+					mModify.visible = true;
+					mWeb.visible = true;
+				}
+			}
+			
+			//上传主页Logo图片
+			protected function OnUploadLogImage(event:MouseEvent):void
+			{
+				choose(true);
+			}
+			
+			//上传标题图片
+			protected function OnUploadTitleImage(event:MouseEvent):void
+			{
+				choose(false);
+			}
+			
+			private function validateEmail(strEmailAddr:String):Boolean
+			{
+				var ret:Boolean = false;
+				var EmailReg:RegExp = /^([a-z0-9A-Z]+[-|\.]?)+[a-z0-9A-Z]@([a-z0-9A-Z]+(-[a-z0-9A-Z]+)?\.)+[a-zA-Z]{2,}$/;				       
+				if (EmailReg.test(strEmailAddr)) 
+				{
+					ret = true;
+				} 
+				
+				return ret;
+			}
+			
+			protected function OnOpenWeb(event:MouseEvent):void
+			{
+				var strCompanyWeb:String = m_iHouse.mDataProcess.webserviceAddr + mTextWebName.text;
+				
+				navigateToURL(new URLRequest(strCompanyWeb), "_blank"); 
+			}
+			
+			//是否允许其它网页嵌入前端编辑器
+			protected function OnEmbedWeb(event:MouseEvent):void
+			{				
+				m_bEmbedWeb = mEmbedWeb.selected ? "1" : "0";
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<s:Rect x="-1000" y="-993" width="5000" height="5000" alpha="0.5">
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>
+	<s:Rect left="0" top="0" right="0" bottom="0">
+		<s:stroke>
+			<s:SolidColorStroke caps="none" color="#000000" joints="miter" miterLimit="4" weight="1"/>
+		</s:stroke>
+		<s:fill>
+			<s:SolidColor color="#444547"/>
+		</s:fill>
+		<s:filters>
+			<s:DropShadowFilter alpha="1" angle="45.0" blurX="15" blurY="15"
+								color="#000000" distance="0" hideObject="false" inner="false"
+								knockout="false" quality="2" strength="1"/>
+		</s:filters>
+	</s:Rect>
+	<s:Label left="8" top="319" text="登录背景图片:" color="#FFFFFF" fontFamily="宋体" fontSize="14"/>
+	<s:Group left="1" top="1" width="100%" height="40" mouseDown="this.startDrag();" mouseUp="this.stopDrag()">
+		<s:Rect left="1" top="1" width="100%" height="40" >
+			<s:fill>
+				<s:SolidColor color="#191B21"/>
+			</s:fill>
+		</s:Rect>
+	</s:Group>
+	<s:Rect left="1" top="39" width="100%" height="2">
+		<s:fill>
+			<s:SolidColor color="#000000"/>
+		</s:fill>
+	</s:Rect>
+	<s:Label left="204" top="11" width="300" color="#FAF9F9" fontFamily="宋体" fontSize="22" text="公司信息"
+			 textAlign="center" id="m_Title" mouseEnabled="false" />
+	<s:Group left="0" bottom="5" width="680" mouseDown="this.startDrag();" mouseUp="this.stopDrag()">
+		<s:Rect left="0" top="19" width="462" height="0">
+			<s:fill>
+				<s:SolidColor color="#000000"/>
+			</s:fill>
+		</s:Rect>		
+		<s:RichText visible="false" left="520" top="35" color="#FCFBFB" fontFamily="宋体" fontSize="14" fontWeight="normal" tabStops="S0 S50" text="渲染完后自动保存到方案效果图集"/>
+	</s:Group>
+	<s:Label left="21" top="65" color="#FFFFFF" fontFamily="宋体" fontSize="16" text="公司名称:"/>
+	<s:Label left="369" top="65" color="#FFFFFF" fontFamily="宋体" fontSize="16" text="联系人:"/>
+	<s:Label left="390" top="132" height="16" color="#FFFFFF" fontFamily="宋体" fontSize="14" text="邮箱:"/>
+	<s:Label left="21" top="132" color="#FFFFFF" fontFamily="宋体" fontSize="16" text="创建时间:"/>
+	<s:TextInput id="mTextName" left="102" top="61" width="229" fontFamily="宋体"/>
+	<s:Label left="51" top="206" color="#FFFFFF" fontFamily="宋体" fontSize="14" text="地址:"/>
+	<s:TextInput id="mTextAddr"  left="102" top="204" width="391" />
+	<s:Label left="390" top="99" color="#FFFFFF" fontFamily="宋体" fontSize="14" text="电话:"/>
+	<s:TextInput id="mTextTel"  left="433" top="96" width="229" />
+	<s:Label left="54" top="99" color="#FFFFFF" fontFamily="宋体" fontSize="14" text="手机:"/>
+	<s:TextInput id="mTextMobi"  left="102" top="96" width="229" restrict="0-9"/>
+	<s:TextInput id="mTextContacts" left="433" top="61" width="229" fontFamily="宋休"/>
+	<mx:DateField id="mTextCreate" left="102" top="130" width="229"  yearNavigationEnabled="true"
+		dayNames="['日','一','二','三','四','五','六']"
+		monthNames="['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月']"
+		formatString="YYYY-MM-DD" fontSize="12"/>
+	<s:TextInput id="mTextEMail" left="433" top="130" width="229"/>
+	<s:Rect left="-1" bottom="0" width="681" height="48" >
+		<s:fill>
+			<s:SolidColor color="#191B21"/>
+		</s:fill>
+	</s:Rect>
+	<s:Button visible="true" left="370" top="505" width="82" height="28" label="取消" buttonMode="true"
+			  click="OnCancel(event)" skinClass="Skins.NormalCreateBtnSkin"/>
+	
+	<s:Button id="mAdd" visible="true" left="241" top="505" width="82" height="28" label="确定"
+			  buttonMode="true" click="OnOK(event)" skinClass="Skins.NormalCreateBtnSkin"/>
+	
+	<s:Button id="mModify" left="241" top="505" width="82" height="28"  label="修改" buttonMode="true" click="OnModify(event)"
+			  skinClass="Skins.NormalCreateBtnSkin" visible="false"/>
+	
+	<s:Button id="mWeb" left="483" top="505" width="122" height="28" label="打开公司网页" buttonMode="true"
+			  click="OnOpenWeb(event)" skinClass="Skins.NormalCreateBtnSkin" visible="false"/>
+	<s:Image id="mLogoImage" left="103" top="243" width="228" height="170"/>
+	<s:Image id="mTitleImage" left="434" top="243" width="228" height="170"/>
+	<s:Label left="362" top="167" text="主页名称:" color="#FFFFFF" fontFamily="宋体" fontSize="14"/>
+	<s:TextInput id="mTextWebName" left="433" top="165" width="229" restrict="A-Za-z0-9."/>
+	<s:Label left="365" top="319" text="Logo图标:" color="#FFFFFF" fontFamily="宋体" fontSize="14"/>
+	<s:Label left="31" top="167" text="用户数量:" color="#FFFFFF" fontFamily="宋体" fontSize="14" />
+	<s:ComboBox id="mCombo" fontFamily="宋体" left="102" top="165" width="229" dataProvider="{mGroupNumber}" labelField="UserNumber" creationComplete="mCombo.textInput.editable = false"/>
+	<s:Button left="165" top="447" width="103" height="28" label="上传图片" click="OnUploadLogImage(event)" 
+			  skinClass="Skins.NormalCreateBtnSkin"/>
+	<s:Button left="502" top="449" width="103" height="28" label="上传图片" click="OnUploadTitleImage(event)"
+			  skinClass="Skins.NormalCreateBtnSkin"/>
+	<mx:ProgressBar id="mProgressBar" left="0" top="436" width="155" label="当前进度: 0%"
+					direction="right" labelPlacement="bottom" maximum="100" minimum="0"
+					mode="manual" visible="false"/>
+	
+	<mx:ProgressBar id="mProgressBar0" left="333" top="433" width="155" label="当前进度: 0%"
+					direction="right" labelPlacement="bottom" maximum="100" minimum="0"
+					mode="manual" visible="false"/>
+	<s:Label x="124" y="425" text="图片格式为jpg,大小为1920*1080"  color="#FFFFFF" fontFamily="宋体" />
+	<s:Label x="471" y="423" text="图片格式为png,大小为200*65"  color="#FFFFFF" fontFamily="宋体" />
+	<s:CheckBox id="mEmbedWeb" left="527" top="203" label="允许编辑器嵌入" click="OnEmbedWeb(event)"
+				color="#FFFFFF" fontFamily="宋体" fontSize="14"/> 
+</s:Group>

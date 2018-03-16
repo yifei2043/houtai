@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx" 
+			   xmlns:local="*" 
+			   xmlns:UI="UI.*" backgroundAlpha="0.0">
+	
+	<fx:Script>
+		<![CDATA[
+			import alternativa.engine3d.materials.A3DUtils;
+			
+			public var m_iHouse:*  = null;
+			public var m_DataProcess:DataProcess = null;
+			public var m_space3d:RenderOBJ3New;
+			
+			public var m_render720PicPath:String = ""; //
+			public var m_modelDir:String = ""; //模型所在目录
+			
+			//主要用于回调，将webapi取得的数据返回给调用端
+			public function OnInit(tmpHouse:* ):void
+			{
+				m_iHouse = tmpHouse;
+
+				if(null != m_iHouse)
+				{
+					mBtnInit.visible = false;
+					mBtnShow3D.visible = false;
+					
+					m_DataProcess = new DataProcess(this);	
+					Space3dInit();
+				}
+			}
+			
+			public function IsInitComplete():Boolean
+			{
+				if(null != m_DataProcess)
+					return m_DataProcess.bInitComplete;
+				
+				return false;
+			}
+			
+			public function Space3dInit():void
+			{
+				m_space3d = RenderOBJ3New.getInstance();
+				m_space3d.gMain = this;
+				
+				mShow3DView.init();
+			}
+			
+			//显示三维模型
+			public function Show3DView(strFolder:String,recordArray:Array):void
+			{
+				var str:String = recordArray[5];
+				str = str.split("\\").join("/");
+				
+				var iCount:int = str.indexOf(".");	
+				
+				//默认使用a3d
+				var strModelFormat:String = "a3d";
+				
+				if(recordArray.length > 16)
+				{
+					if("" != recordArray[15])
+						strModelFormat = recordArray[15];
+				}
+
+				var strPathFile:String = strFolder + str.slice(0,iCount+1) + strModelFormat;
+				
+				m_space3d.m_strPathThumbnail = str.slice(0,iCount+1)+ "jpg";
+				
+				var iLastCount:int = strPathFile.lastIndexOf("/");
+				m_render720PicPath = strPathFile.substr(0,iLastCount + 1) + "720/images/pic2/";
+				
+				m_modelDir = str.substr(0,str.lastIndexOf("/") + 1);
+				
+				mShow3DView.visible = true;
+				
+				m_space3d.m_picSize = recordArray[4]; //图片长、宽、高
+				m_space3d.OnLoadA3D( strPathFile,  str);
+			}
+
+			protected function OnTest(event:MouseEvent):void
+			{
+ 				var arryData:Array = new Array("客餐厅","客厅","配套","PT1693E","1300-1300-760",
+					"c95EEBC8C6A743ECB05CB3984C352D698\\c9DF3A1440C3AFB5302CC96F2575D5073\\c100AEA5036061947901DA6AB12F81258\\PT1693E\\PT1693E.jpg",
+					"0","2","90.03kb","DA370693-A653-F34E-ACB7-6215A3E03B50","102");
+ 			
+				/* var arryData:Array = new Array("客餐厅","客厅","配套","PT1693E","1300-1300-760",
+					"c95EEBC8C6A743ECB05CB3984C352D698/c5E406ABE8914222DDD4BC6A5948ADD3C/c5E406ABE8914222DDD4BC6A5948ADD3C/BXQIcbg4545/BXQIcbg4545.jpg",
+					"0","2","90.03kb","DA370693-A653-F34E-ACB7-6215A3E03B50","102"); */
+				
+			
+				//Show3DView("http://127.0.0.1/ihouse/data/jiaju/",arryData);
+				//Show3DView("C:/inetpub/wwwroot/ihouse/data/jiaju/",arryData);
+			}
+			
+			protected function OnTestInit(event:MouseEvent):void
+			{
+				m_DataProcess = new DataProcess(this);	
+
+				Space3dInit();
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<s:Button id="mBtnInit" visible="true" x="10" y="10" label="初始化" click="OnTestInit(event)"/>
+	<s:Button id="mBtnShow3D" visible="true" x="98" y="10" label="显示3D" click="OnTest(event)"/>
+	<UI:Show3DView id="mShow3DView" m_iHouse3DView ="{this}" visible="false" left="1" right="0" top="5" bottom="0" />
+    <UI:ShowRenderingDialog id="mShowRendering"  m_iHouse3DView="{this}"  x="{(this.width-mShowRendering.width)/2}" y="{(this.height-mShowRendering.height)/2-8}" visible="false"  />
+	<UI:Alert3DViewDialog id="mAlert3DViewDialog"  m_iHouse3DView="{this}"  x="{(this.width-mAlert3DViewDialog.width)/2}" y="{(this.height-mAlert3DViewDialog.height)/2}" visible="false"  />
+</s:Application>

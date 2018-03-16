@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="400" height="300" fontFamily="宋体"
+		 fontSize="26" fontStyle="italic" fontWeight="bold">
+	
+	<fx:Script>
+		<![CDATA[	
+			import mx.core.UIComponent;
+			public var m_iHouse:iHouseResourceManager;
+			public function init() : void
+			{				
+			}
+			
+			public  function OnClose():void
+			{
+				this.visible = false;  
+			}	
+			
+			/***
+			 * 更新所有模型
+			 * 
+			 */
+			public function OnUpdateAll():void
+			{
+				m_iHouse.mDataView.ExportModelAll();
+				
+				//如果有产品信息时，也需要导出
+				if("1" == m_iHouse.mDataProcess.mProductInfo)
+					m_iHouse.mDataView.ExportProductAll();
+			}
+			
+			/****
+			 * 更新选中的模型
+			 * 
+			 */
+			public function OnUpdateSelect():void
+			{
+				m_iHouse.mDataView.ExportModelSelect();
+			}
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<mx:Blur id="blurOn" blurXFrom="0.0" blurXTo="10.0" blurYFrom="0.0" blurYTo="10.0"/>
+		<mx:Blur id="blurOut" blurXFrom="10.0" blurXTo="0.0" blurYFrom="10.0" blurYTo="0.0"/>
+	</fx:Declarations>	
+	<s:Rect x="-1000" y="-1000" width="5000" height="5000" alpha="0.5">
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>		
+	<s:Group left="0" right="0" top="0" bottom="0" mouseDown="this.startDrag();" mouseUp="this.stopDrag()">
+		<s:Rect right="20" top="20" left="10" bottom="8" radiusX="5">
+			<s:fill>
+				<s:SolidColor color="#ffffff"/>
+			</s:fill>		
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="8" blurY="8" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 		
+		</s:Rect>	
+		<s:Rect right="0" top="0" width="35" height="35" radiusX="45">
+			<s:stroke>
+				<s:SolidColorStroke color="#ffffff" caps="none" weight="3" joints="miter" miterLimit="4"/>
+			</s:stroke>	
+			<s:fill>
+				<s:SolidColor color="#000000"/>
+			</s:fill>
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="4" blurY="4" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 	
+		</s:Rect>
+		<s:Image right="8" top="10"  source="@Embed('/assets/close.png')" 
+				 mouseDownEffect="{blurOn}" mouseUpEffect="{blurOut}"
+				 buttonMode="true" click="OnClose();" />
+		
+		<s:Label id="mTitle1" right="229" y="44" fontFamily="宋体" fontSize="26" text="更新模型库" visible="true"/>
+  				
+		<s:Button id="mEffect1" right="131" bottom="131" width="150" height="23" label="上传选中模型资源" click="OnUpdateSelect();"
+				  fontFamily="宋体" fontSize="16" fontStyle="normal" fontWeight="normal"
+				  skinClass="Skins.CommonButton"/>
+		
+		<s:Button id="mEffect2" right="131" bottom="78" width="150" height="23" label="发布给前端使用" click="OnUpdateAll();"
+				  fontFamily="宋体" fontSize="16" fontStyle="normal" fontWeight="normal"
+				  skinClass="Skins.CommonButton"/>
+		
+		
+	</s:Group>		
+</s:Group>
+

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:s="library://ns.adobe.com/flex/spark"
+				xmlns:fx="http://ns.adobe.com/mxml/2009"
+				xmlns:d="http://ns.adobe.com/fxg/2008/dt"
+				width="168" height="140">
+	<fx:Script>
+		<![CDATA[
+
+			
+			import mx.controls.Alert;
+
+			public function Delete():void
+			{				
+				data.gParent.deleteScene(data.handle);				
+			}
+			
+			public function Click():void
+			{
+/* 				if(data.gParent.mBtn0.selected == true )
+				{
+					data.gParent.m_cProject = data;
+				} */
+			}
+			
+			public function SetDefault():void
+			{
+
+			}
+			
+			protected function OnDoubleClick():void
+			{
+				var url:URLRequest = new URLRequest(data.thumbnailImage);	
+				navigateToURL(url);
+			}
+			
+		]]>
+		
+	</fx:Script>
+	<s:states>
+		<s:State name="normal"/>
+		<s:State name="hovered"/>
+		<s:State name="selected"/>
+	</s:states>	
+	<s:Rect x="0" y="0" width="168" height="140" x.hovered="0.001">
+		<s:stroke>
+			<s:SolidColorStroke color="#aaaaaa" caps="none" weight="1" joints="miter" miterLimit="4"/>
+		</s:stroke>				
+	</s:Rect>
+	<s:Rect x="0" y="110" width="158" height="20" visible="false">
+		<s:fill>
+			<s:SolidColor alpha="0.75" color="#000000"/>
+		</s:fill>
+	</s:Rect>
+	<s:Image width="150" height="110" click="Click();" horizontalCenter="0" scaleMode="stretch"
+			 smooth="true" source="{data.thumbnailImage}" verticalCenter="-9"
+			 doubleClick="OnDoubleClick()"/>
+	
+	<s:Group x="100"
+			 y.hovered="107"
+			 y.normal="105" width="62"
+			 y.selected="107">
+		<s:Path x="18" y="0.021"
+				data="M 13.065 0 L 69.961 0 L 69.961 31.82 L 0 31.82 L 0 13.046 L 13.065 0 Z"
+				 width="51.961" visible="false">
+			<s:fill>
+				<s:SolidColor alpha="0.5" color="#000000"/>
+			</s:fill>
+		</s:Path>
+		<s:Button x="-85" y="4"  skinClass="Skins.btn_star" toolTip="默认套装" click="SetDefault();" visible="false" enabled="{data.data.isDefault!='1'}"/>
+		<s:Button id="deleteButton" visible="true" x="35" y="11" click="Delete();" scaleX="0.7"
+				  scaleY="0.7" skinClass="Skins.DeleteHouseBtnSkin" toolTip="删除"/>
+		<s:Button x="38"  y="0"  skinClass="Skins.EditHouseBtnSkin" toolTip="编辑" click="" visible="false"/>
+	</s:Group>
+	<s:Rect x="0" y="0" width="158" height="1">
+		<s:fill>
+			<s:SolidColor alpha="0.12" color="#FFFFFF"/>
+		</s:fill>
+	</s:Rect>
+	<s:Label x="9" y="120" width="87" color="#000000" fontFamily="宋体" text="{data.title}"
+			 textAlign="center" verticalAlign="middle"
+			 fontSize="14"
+			 x.normal="9" y.normal="121" 
+			 />
+</s:ItemRenderer>

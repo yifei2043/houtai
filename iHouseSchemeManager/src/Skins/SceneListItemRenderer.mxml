@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:s="library://ns.adobe.com/flex/spark"
+				xmlns:fx="http://ns.adobe.com/mxml/2009"
+				xmlns:d="http://ns.adobe.com/fxg/2008/dt"
+				width="184" height="140">
+	<fx:Script>
+		<![CDATA[
+
+			
+			import mx.controls.Alert;
+
+			public function Delete():void
+			{				
+				// 删除该方案 ( 物理文件夹不删除 )	
+				data.gParent.deleteScene(data.handle);
+				
+			}
+			
+			public function ShowScenePicture():void
+			{
+				data.gParent.ShowScenePicture(data.handle);
+			}
+			
+			public function ShowShareUser():void
+			{
+				data.gParent.ShowShareUser(data.handle);
+			}
+
+			public function ShowSchemeInfo():void
+			{
+				data.gParent.ShowSchemeInfo(data.handle);
+			}
+			
+		]]>
+		
+	</fx:Script>
+	<s:states>
+		<s:State name="normal"/>
+		<s:State name="hovered"/>
+		<s:State name="selected"/>
+	</s:states>	
+	<s:Rect left="0" top="0" width="188" height="140" x.hovered="0.001">
+		<s:stroke>
+			<s:SolidColorStroke color="#aaaaaa" caps="none" weight="1" joints="miter" miterLimit="4"/>
+		</s:stroke>				
+	</s:Rect>
+	<s:Rect visible="false" left="0" top="110" width="178" height="20"
+			left.normal="1" top.normal="117">
+		<s:fill>
+			<s:SolidColor alpha="0.75" color="#000000"/>
+		</s:fill>
+	</s:Rect>
+	<s:Image width="170" height="110" horizontalCenter="0" smooth="true" scaleMode="stretch" source="{data.thumbnailImage}" 
+				  verticalCenter="-9" doubleClick="ShowScenePicture();" />
+	
+	<s:Group right="5" bottom="0" width="80"
+			 right.normal="5" bottom.normal="3" width.normal="111" height.normal="20">		
+		<s:Button id="schemeButton" visible="true" right="70" top="2" width="22.35" height="22.35"
+				  click="ShowSchemeInfo();" scaleX="0.7" scaleY="0.7"
+				  skinClass="Skins.ViewSchemeBtnSkin" toolTip="查看方案信息"/>
+		
+		<s:Button id="shareView" visible="{data.editable}" right="45" top="2" alpha="0.5"
+				  click="ShowShareUser();" scaleX="0.7" scaleY="0.7"
+				  skinClass="Skins.ViewPictrueShareSkin" toolTip="共享方案"/>
+		
+		<s:Button id="viewButton" visible="true" right="25" top="2" alpha="0.5"
+				  click="ShowScenePicture();" scaleX="0.7" scaleY="0.7"
+				  skinClass="Skins.ViewPictrueBtnSkin" toolTip="查看方案图片"/>
+		
+		<s:Button id="deleteButton" right="0" top="2" click="Delete();" scaleX="0.7"
+				  scaleY="0.7" skinClass="Skins.DeleteHouseBtnSkin" toolTip="删除" visible="{data.editable}"/>
+	</s:Group>
+	<s:Rect left="0" top="0" width="178" height="1">
+		<s:fill>
+			<s:SolidColor alpha="0.12" color="#FFFFFF"/>
+		</s:fill>
+	</s:Rect>
+	<s:Label left="9" top="120" width="87" color="#000000" fontFamily="宋体" fontSize="14"
+			 text="{data.title}" textAlign="center" verticalAlign="middle"
+			 left.normal="9" top.normal="120" width.normal="80"/>
+	
+</s:ItemRenderer>

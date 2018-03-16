@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx" 
+			   minWidth="955" minHeight="600"
+			   xmlns:local="*" xmlns:UI="UI.*" 
+			   backgroundAlpha="0.0" creationComplete="Init();" >  
+	
+	<fx:Script>
+		<![CDATA[
+			
+			//用户ID，默认为帐号为zhouqj的id作测试
+			public var mStrUserID:String = "78";
+			
+			//是否为管理员  1:是管理员 0:非管理员
+			public var mStrAdministrator:String = "1";
+			
+			//登录时用户名
+			public var mUserName:String = "zhouqj";
+			
+			public var mStrCompanyID:String = "2";
+			
+			//共享数据目录,默认使用浩思云科技
+			public var mStrFolder:String = "chenx";
+			
+			//帐号类型:0 企业  1：设计师  2：普通用户
+			public var mStrAccountType:String = "0";
+			
+			//是否显示操作按钮
+			public var mbEditable:Boolean = false;
+			
+			public var mDataProcess:SchemeDataProcess = null;
+			
+			public function Init():void
+			{				
+				mDataProcess = new SchemeDataProcess(this);	
+				
+				SetWindowPosition(1,1,1,1); 							
+			}
+			
+			public function SetLoginInfo(strUserID:String,StrAdministrator:String,
+										 UserName:String,StrCompanyID:String,
+										 StrFolder:String,StrAccountType:String):void
+			{
+				mStrUserID = strUserID;
+				mStrAdministrator = StrAdministrator;
+				mUserName = UserName;
+				mStrCompanyID = StrCompanyID;
+				mStrFolder = StrFolder;
+				mStrAccountType = StrAccountType;
+				
+				//管理员与企业帐号可以编辑操作且不能删除临时文件
+				mbEditable = ("11" == mStrAccountType || "0" == mStrAccountType) ? true : false;
+			}
+			
+			public function SetWindowPosition(nLeft:int,nTop:int,nRight:int,nBottom:int):void
+			{
+				mSchemeView.left = nLeft;
+				mSchemeView.top = nTop;
+				mSchemeView.right = nRight;
+				mSchemeView.bottom = nBottom;
+			}
+			
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	
+	<UI:SchemeView  id="mSchemeView"  m_iHouse="{this}"  left="1" right="1" top="50" bottom="0" visible="true" />
+	<UI:ScenePictureView   id="mScenePictureView" m_iHouse="{this}" horizontalCenter="0" verticalCenter="0"   visible="false"/>
+	<UI:SchemeDialog   id="mSchemeDialog" m_iHouse="{this}" horizontalCenter="0" verticalCenter="0"   visible="false"/>
+	
+	<UI:SchemeHelpDialog 	id="mHelpDialog"   m_iHouse="{this}" x="{(this.width-mHelpDialog.width)/2}" y="{(this.height-mHelpDialog.height)/2}" visible="false"  />
+	<UI:SchemeAlertDialog id="mAlertDialog"   m_iHouse="{this}" x="{(this.width-mAlertDialog.width)/2}" y="{(this.height-mAlertDialog.height)/2}" visible="false"  />
+	<UI:SchemeYesNoDialog id="mYesNoDialog"  m_iHouse="{this}" x="{(this.width-mYesNoDialog.width)/2}" y="{(this.height-mYesNoDialog.height)/2}" visible="false"  />
+
+</s:Application>

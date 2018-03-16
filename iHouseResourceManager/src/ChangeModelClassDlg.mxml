@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="310" height="320" fontFamily="宋体"
+		 fontSize="26" fontStyle="italic" fontWeight="bold">
+	
+	<fx:Script>
+		<![CDATA[	
+			import com.google.zxing.client.result.BookmarkDoCoMoResultParser;
+			
+			import mx.core.UIComponent;
+			import mx.rpc.AbstractOperation;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.InvokeEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			public var m_iHouse:iHouseResourceManager;			
+			private var recordData:Array;
+			
+			public function Show(recordArray:Array):void
+			{
+				recordData = recordArray;
+				
+				mTextClass1.text = recordArray[0].toString();
+				mTextClass2.text = recordArray[1].toString();
+				mTextClass3.text = recordArray[2].toString();
+				//mTextName.text   = recordArray[3].toString();
+				var strModeName:String = "";
+				if(recordArray.length > 17)
+					strModeName = recordArray[16];
+				else
+					strModeName = recordArray[3];
+				
+				mTextName.text   = strModeName;
+					
+				this.visible = true;
+			}
+			
+			protected function OnUpdate(event:MouseEvent):void
+			{
+				if(recordData.length == 0)
+					return ;
+				
+				if("" == mTextClass1.text)
+				{
+					m_iHouse.mAlertDialog.show("分类一不能为空!");
+					return;
+				}
+				
+				if("" == mTextClass2.text)
+				{
+					m_iHouse.mAlertDialog.show("分类二不能为空!");
+					return;
+				}
+				
+				if("" == mTextClass3.text)
+				{
+					m_iHouse.mAlertDialog.show("分类三不能为空!");
+					return;
+				}
+				
+/* 				if("" == mTextName.text)
+				{
+					m_iHouse.mAlertDialog.show("名称不能为空!");
+					return;
+				} */
+				
+				m_iHouse.mDataProcess.OnChangeModelClass(recordData[9].toString(), //uuid
+									                     mTextClass1.text,
+														 mTextClass2.text,
+														 mTextClass3.text,
+														 mTextName.text);			    
+			}
+			
+			
+			public  function OnClose():void
+			{
+				this.visible = false;  
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<mx:Blur id="blurOn" blurXFrom="0.0" blurXTo="10.0" blurYFrom="0.0" blurYTo="10.0"/>
+		<mx:Blur id="blurOut" blurXFrom="10.0" blurXTo="0.0" blurYFrom="10.0" blurYTo="0.0"/>
+	</fx:Declarations>	
+	<s:Rect x="-1000" y="-1000" width="5000" height="5000" alpha="0.5">
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>		
+	<s:Group left="5" right="5" top="5" bottom="5" >
+		<s:Group left="10" right="35" top="20" height="45" mouseDown="this.startDrag();" mouseUp="this.stopDrag()"/>	
+		<s:Rect right="5" top="5" left="5" bottom="5" radiusX="5">
+			<s:fill>
+				<s:SolidColor color="#ffffff"/>
+			</s:fill>		
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="8" blurY="8" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 		
+		</s:Rect>	
+		<s:Button id="mUpdate" left="89" bottom="14" width="67" height="23" label="更新"
+				  click="OnUpdate(event)" fontFamily="宋体" fontSize="16" fontStyle="normal"
+				  fontWeight="normal" skinClass="Skins.CommonButton" tabIndex="10"/>
+		<s:Rect right="-5" top="-5" width="35" height="35" radiusX="45">
+			<s:stroke>
+				<s:SolidColorStroke color="#ffffff" caps="none" weight="3" joints="miter" miterLimit="4"/>
+			</s:stroke>	
+			<s:fill>
+				<s:SolidColor color="#000000"/>
+			</s:fill>
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="4" blurY="4" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 	
+		</s:Rect>
+		<s:Image right="4" top="4"  source="@Embed('/assets/close.png')" 
+				 mouseDownEffect="{blurOn}" mouseUpEffect="{blurOut}"
+				 buttonMode="true" click="OnClose();" />
+		<s:Button id="mEffect2" left="170" bottom="14" width="67" height="23" label="关闭"
+				  click="OnClose()" fontFamily="宋体" fontSize="16" fontStyle="normal"
+				  fontWeight="normal" skinClass="Skins.CommonButton" tabIndex="12"/>
+		<s:Label left="59" top="92" text="分类一:" fontFamily="宋体" fontSize="14" fontStyle="normal" fontWeight="normal"/>
+		<s:Label left="59" top="141" text="分类二:" fontFamily="宋体" fontSize="14" fontStyle="normal" fontWeight="normal"/>
+		<s:Label left="59" top="188" text="分类三:" fontFamily="宋体" fontSize="14" fontStyle="normal" fontWeight="normal"/>
+		<s:Label left ="73" top="236" text="名称:" fontFamily="宋体" fontSize="14" fontStyle="normal" fontWeight="normal"/>
+		<s:TextInput id="mTextClass1" left="119" top="89" width="144" height="26" fontFamily="宋体"
+					 fontSize="15" fontStyle="normal" fontWeight="normal" tabIndex="1"/>
+		<s:TextInput id="mTextClass2" left="119" top="137" width="144" height="26" fontFamily="宋体" fontSize="15"
+					 fontStyle="normal" fontWeight="normal" tabIndex="3"/>
+		<s:TextInput id="mTextClass3" left="119" top="184" width="144" height="26" fontFamily="宋体"
+					 fontSize="15" fontStyle="normal" fontWeight="normal" tabIndex="5"/>
+		<s:TextInput id="mTextName" left="119" top="231" width="144" height="26" fontFamily="宋体"
+					 fontSize="15" fontStyle="normal" fontWeight="normal" tabIndex="7"/>
+		<s:Rect left="10" right="10" top="70" width="260" height="1">
+			<s:stroke>
+				<s:SolidColorStroke color="#dddddd" caps="none" weight="2" joints="miter" miterLimit="1"/>
+			</s:stroke>			
+		</s:Rect>
+		<s:Label id="mTitle1" visible="true" left="29" top="36"  fontFamily="宋体"  fontSize="26"
+				 text="产品分类"/>
+		
+		
+		
+	</s:Group>		
+</s:Group>
+

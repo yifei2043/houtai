@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"		 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"  >
+	
+	<fx:Script>
+		<![CDATA[							
+			import alternativa.types.Float;
+			
+			import flash.display.Bitmap;
+			import flash.display.BitmapData;
+			import flash.display.MovieClip;
+			import flash.display.Sprite;
+			import flash.events.Event;
+			import flash.events.MouseEvent;
+			import flash.text.TextField;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			
+			public var m_iHouse3DView:iHouse3DView;
+			
+			public function init():void
+			{	
+				m_A3D.addElement(m_iHouse3DView.m_space3d);
+			}  
+			
+			public function OnShow():void
+			{
+				this.visible = true;
+			}
+	
+			public  function OnClose():void
+			{
+/* 				m_A3D.removeAllElements();
+				m_iHouse3DView.m_space3d.gMain = null;
+				m_iHouse3DView.m_space3d = null;
+				m_iHouse3DView.visible = false; */
+				
+				m_iHouse3DView.m_iHouse.dispatchEvent(new Event("iHouse3DViewClose","OnClose3DView"));
+			}	
+
+			public function OnChange():void
+			{
+				if( mChange.selected == true )
+				{
+					m_iHouse3DView.m_space3d.m_CoordCross.visible = true;
+					m_iHouse3DView.m_space3d.m_coordinate.visible = true;
+				}
+				else
+				{
+					m_iHouse3DView.m_space3d.m_CoordCross.visible = false;
+					m_iHouse3DView.m_space3d.m_coordinate.visible = false;
+				}
+			}
+			
+			public function OnRender():void	
+			{
+				m_iHouse3DView.mShowRendering.ShowDialog(360,270);
+				
+				var FileByteArray:ByteArray  = new ByteArray();
+				FileByteArray.position = 0;  
+				FileByteArray.endian   = Endian.LITTLE_ENDIAN;	
+				
+				FileByteArray.writeInt(2014);
+								
+ 				WriteModel(FileByteArray);
+				WriteView(FileByteArray);
+				m_iHouse3DView.m_DataProcess.OnCreateFile(FileByteArray, false);	
+				
+			}			
+
+			public var mModelName:String = "";
+			public function WriteModel( byteArray:ByteArray ):void
+			{
+				byteArray.writeInt(1);	// 有多少家具
+				
+				// 写家具模型			
+				var iTemp:int         	= m_iHouse3DView.m_space3d.m_strPathFile.lastIndexOf("/");
+				var strFileName:String	= m_iHouse3DView.m_space3d.m_strPathFile.slice(iTemp+1);
+				var arrayName:Array		= strFileName.split(".");
+				
+				// 1. 记录多个mesh 统一的位置、旋转、长宽高
+				//=========================================================================================
+				byteArray.writeFloat(0);	// 位置
+				byteArray.writeFloat(0);
+				byteArray.writeFloat(-500)//m_iHouse.m_space3d.fHeight/2);  
+				
+				byteArray.writeFloat(0);	// 旋转
+				
+				byteArray.writeFloat(1);	//长宽高
+				byteArray.writeFloat(1);
+				byteArray.writeFloat(1);  
+				
+				// 名称 家具有多个mesh组成，所以有多个名称	
+				/*
+				var arrayTemp:Array = arrayName[0].split("-");	// 去掉 "-"
+				var strName1:String ="c";
+				for( var k:int =0; k<arrayTemp.length; k++ )
+					strName1 += arrayTemp[k];
+				
+				byteArray.writeInt(strName1.length);			// 记录去掉 "-"的名字	
+				byteArray.writeMultiByte(strName1,"utf-8");	
+				*/
+				
+				//c95EEBC8C6A743ECB05CB3984C352D698/c9DF3A1440C3AFB5302CC96F2575D5073/c100AEA5036061947901DA6AB12F81258/PT1693E/PT1693E.jpg
+				var strModelName:String = m_iHouse3DView.m_space3d.m_strFile;
+				var nPos:int = strModelName.lastIndexOf("/");
+				strModelName = strModelName.substr(0,nPos);
+				
+				nPos = strModelName.lastIndexOf("/");
+				strModelName = "c" + strModelName.substr(nPos + 1);
+				
+				byteArray.writeInt(strModelName.length);			
+				byteArray.writeMultiByte(strModelName,"utf-8");	
+				
+				// 图片相对data\\jiaju\\的路径
+				//=================================================================================================
+				var iIndex:int 		 	= m_iHouse3DView.m_space3d.m_strFile.lastIndexOf("/");
+				var strPath:String		= m_iHouse3DView.m_space3d.m_strFile.slice(0,iIndex+1);	
+				var arrayTemp1:Array 	= strPath.split("/");
+				strPath = "";	
+				for( var m:int =0; m<arrayTemp1.length; m++ )
+				{
+					if( arrayTemp1[m].length>0 )
+						strPath += arrayTemp1[m]+"\\";	  	
+				}
+				byteArray.writeInt(strPath.length);
+				byteArray.writeMultiByte(strPath,"utf-8");	   
+				
+				var bUse:Boolean = true;				
+				if( bUse == true )
+				{
+					var meshArrayCount:int = 0;
+					
+					for(var k:int = 0;k<m_iHouse3DView.m_space3d.m_MeshArray.length; k++ )		// 记录mesh 三角形数
+					{
+						if(null != m_iHouse3DView.m_space3d.m_MeshArray[k].geometry)
+							++meshArrayCount;
+					}					
+					
+					//byteArray.writeInt(m_iHouse3DView.m_space3d.m_MeshArray.length);			// 记录mesh 个数			
+					byteArray.writeInt(meshArrayCount);			// 记录mesh 个数
+					
+					for(var k:int = 0;k<m_iHouse3DView.m_space3d.m_MeshArray.length; k++ )		// 记录mesh 三角形数
+					{
+						if(null != m_iHouse3DView.m_space3d.m_MeshArray[k].geometry)
+						   byteArray.writeInt(m_iHouse3DView.m_space3d.m_MeshArray[k].geometry.numTriangles);
+					}
+				}
+			}
+
+		
+			public function calcFov(d:int, w:int, r:Number) {
+				var f;
+				var vertical = w;
+				if (r < 1) 
+				{
+					vertical = vertical/r;
+				}
+				
+				f = Math.atan(vertical/d/2)*2 * (180 / Math.PI);
+				
+				return f;
+			}
+			
+/* 			private function GetFieldOfView():Number{
+				
+				var halfDiag:Number = Math.sqrt(m_iHouse3DView.m_space3d.camera.view.width * m_iHouse3DView.m_space3d.camera.view.width + 
+					                            m_iHouse3DView.m_space3d.camera.view.height * m_iHouse3DView.m_space3d.camera.view.height) / 2;
+				
+				var dist:Number = Math.abs(m_iHouse3DView.m_space3d.camera.z);
+				
+				var fov:Number = 2 * Math.atan2( halfDiag, dist);
+				
+				return fov;
+			} */
+			
+			private function GetFieldOfView():Number{
+				
+				var halfDiag:Number = Math.sqrt(m_iHouse3DView.mShow3DView.m_A3D.width * m_iHouse3DView.mShow3DView.m_A3D.width + 
+					                            m_iHouse3DView.mShow3DView.m_A3D.height * m_iHouse3DView.mShow3DView.m_A3D.height) / 2;
+				
+				var dist:Number = Math.abs(m_iHouse3DView.m_space3d.camera.z);
+				
+				var fov:Number = 2 * Math.atan2( halfDiag, dist);
+				
+				return fov;
+			}
+			
+			
+			public function WriteView( byteArray:ByteArray ):void
+			{  
+				var tmpMatrix3D:Matrix3D = new Matrix3D();
+				
+				tmpMatrix3D.identity();		
+				tmpMatrix3D.appendRotation((180+m_iHouse3DView.m_space3d.camera.rotationX*180/Math.PI),Vector3D.X_AXIS);
+				tmpMatrix3D.appendRotation(m_iHouse3DView.m_space3d.camera.rotationZ*180/Math.PI,Vector3D.Z_AXIS);
+				
+				byteArray.writeFloat(tmpMatrix3D.rawData[0]);  
+				byteArray.writeFloat(tmpMatrix3D.rawData[1]);
+				byteArray.writeFloat(tmpMatrix3D.rawData[2]);
+				
+				byteArray.writeFloat(tmpMatrix3D.rawData[4]);
+				byteArray.writeFloat(tmpMatrix3D.rawData[5]);
+				byteArray.writeFloat(tmpMatrix3D.rawData[6]);
+				
+				byteArray.writeFloat(tmpMatrix3D.rawData[8]);
+				byteArray.writeFloat(tmpMatrix3D.rawData[9]);
+				byteArray.writeFloat(tmpMatrix3D.rawData[10]);
+				
+				byteArray.writeFloat(m_iHouse3DView.m_space3d.camera.x);
+				byteArray.writeFloat(m_iHouse3DView.m_space3d.camera.y);
+				byteArray.writeFloat(m_iHouse3DView.m_space3d.camera.z);
+				
+				//byteArray.writeInt(gMain.mSetting.m_iRenderImageSize);
+				byteArray.writeFloat(1);
+				byteArray.writeFloat(50);
+				
+				var fov:Number = 1.0466;//calcFov(40000,m_iHouse3DView.mShow3DView.m_A3D.width,this.width/this.height);
+				
+				byteArray.writeFloat(fov);// 1.0466)
+				//byteArray.writeFloat(m_iHouse3DView.m_space3d.camera.fov);
+				
+				// 渲染的图片尺寸
+			//	var strRenderSize:String = "640X480";
+				var strRenderSize:String = "180X135";
+				byteArray.writeInt(strRenderSize.length);			
+				byteArray.writeMultiByte(strRenderSize,"utf-8");	
+				
+				// 是否有外景 ( 外景一一对应 )
+				byteArray.writeInt(0);  
+				
+				// 光照方式  
+				byteArray.writeInt(1);		// 45度俯视
+				//byteArray.writeInt(0);		// 漫游
+				
+				//  渲染方式
+				byteArray.writeInt(4);// 0 效果图渲染， 1 全景， 2 整房间互动 3 单品720渲染 4 渲染缩略图
+				
+				byteArray.writeInt(0);// 室外光照方向
+			}			
+
+		]]>
+	</fx:Script>	
+	<fx:Declarations>
+	</fx:Declarations>	
+
+	<!--
+	<s:Rect left="1" bottom="54" right="1" height="2">
+		<s:fill>
+			<s:SolidColor color="#000000"/>
+		</s:fill>
+	</s:Rect>	
+	
+	<s:Rect left="1" bottom="0" right="1" height="54" >
+		<s:fill>
+			<s:SolidColor color="#191B21"/>
+		</s:fill>
+	</s:Rect>-->	
+	
+	<s:Group id="m_cProgressGroup" x="20" bottom="20" visible="false" >
+		<s:Label x="0" y="2" fontFamily="宋体" fontSize="12" text="下载资源" color="#FFFFFF"/>		
+		<mx:ProgressBar id="m_cProgress" x="50" y="0" width="200" height="20" chromeColor="#FF3333"
+						fontFamily="宋体" fontSize="12" labelPlacement="center" maximum="100" minimum="0" mode="manual"/>		
+	</s:Group>	
+
+	<s:Button x="60" y="265" width="83" height="36" label="返回" cornerRadius="5" fontFamily="宋体"
+			  fontSize="16" fontWeight="bold" click="OnClose();"/>
+	<s:CheckBox x="60" y="180" id="mChange" label="显示地面网格" fontFamily="宋体" change="OnChange();" selected="true"/>
+	<s:Button x="59" y="99" width="91" height="26" label="渲染缩略图" fontFamily="宋体" click="OnRender();"/>
+	
+	<s:Label x="62" y="29" width="75" height="25" fontFamily="宋体" fontWeight="normal" text="A3D模型尺寸:"
+			 verticalAlign="middle"/>
+	<s:TextInput x="19" y="60" width="170" editable="false" id="mSize"/>
+	<s:Group id="m_A3D" left="210" top="0" right="0" bottom="2"/>
+</s:Group>

@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="640" height="240" >
+	
+	<fx:Script>
+		<![CDATA[				
+			import mx.core.UIComponent;
+			import mx.utils.UIDUtil;
+
+			
+			public 	  var m_iHouse:iHouseResourceManager;	
+			private  var m_fileRef:FileReference	= new FileReference();
+			public 	  var m_loadKeyWord:URLLoader	= new URLLoader();
+			private  var m_strKeyWordArray:Array;
+			public   var m_strPath:String;
+			
+			public function init() : void
+			{	
+				m_loadKeyWord.addEventListener(Event.COMPLETE, OnSystemResult);
+			//	m_loadKeyWord.load(new URLRequest("./word.cvs"));	
+				var times:Date = new Date;
+				m_loadKeyWord.load(new URLRequest(m_iHouse.mDataProcess.webserviceAddr+"ihouse/system/word.cvs"+"?"+String(times.milliseconds)));
+				
+			}
+			
+			public function OnShow():void
+			{
+				m_dataText.text = "data\\jiaju\\kct\\chaji\\bianji\\KT-bianji2015126\\vrscene";
+				this.visible = true;	
+			}
+						
+			public function OnSystemResult(e:Event):void
+			{
+				m_loadKeyWord.removeEventListener(Event.COMPLETE, OnSystemResult);						
+				var strData:String = e.target.data;				
+				m_strKeyWordArray = strData.split("\r\n"); 
+				return;
+			}	
+			
+			public function ChangeVRScene():void
+			{
+				if( this.m_dataText.text.length<=5 )
+				{
+					m_iHouse.mHelpDialog.show("模型转换路径没有填写");
+					return;
+				}      
+				
+/* 				if( m_dataText.text.slice(0,1) == "/" )
+				{
+					m_dataText.text = m_dataText.text.slice(1);
+				}		
+				
+				if( m_dataText.text.substr(m_dataText.text.length-1,1) != "/" )
+				{
+					m_dataText.text+="/";
+					return;
+				}	
+				  
+				var arrayTemp1:Array = m_dataText.text.split("/");
+				m_strPath=arrayTemp1[0]+"\\";
+				for( var m:int =1; m<arrayTemp1.length; m++ )
+				{
+					if( arrayTemp1[m].length>0 )
+						m_strPath += arrayTemp1[m]+"\\";		
+				} */			
+				m_strPath=m_dataText.text;
+				OnLoadA3D();				
+			}
+			
+			public var fileVRScene:FileReference  = new FileReference;
+			private function OnLoadA3D():void
+			{				
+				fileVRScene.addEventListener(Event.SELECT,startUpload); 
+				fileVRScene.addEventListener(Event.COMPLETE,endUpload);
+				fileVRScene.browse([new FileFilter("Images(*.VRScene)","*.VRScene;")]);
+			}
+			
+			protected function startUpload(e:Event):void
+			{
+				fileVRScene.removeEventListener(Event.SELECT,startUpload); 
+				fileVRScene.load(); 
+
+			}
+
+			public function GenerateUUID():String
+			{
+				var uuid:String = UIDUtil.createUID(); 
+				
+				var arrayTemp:Array = uuid.split("-");	// 去掉 "-"
+				var strName1:String = arrayTemp[0];
+				for( var k:int =1; k<arrayTemp.length; k++ )
+					strName1 += arrayTemp[k];
+				
+				return strName1;  
+			}
+			
+			public var m_bMtlMulti:Boolean = false;
+			public function ChangeWord(strData:String,strKey:String, strNewName:String):String
+			{
+				
+				if( strKey == "TexAColor")
+				{
+					strKey+=" ";
+				}
+				
+				var strTemp:String;
+				var strNewData:String;
+				
+				var iStartOld:int = 0;
+				var iStart:int 	= strData.indexOf(strKey,iStartOld);
+				while( iStart != -1 )	// 同关键词有重复使用的情况
+				{
+					var iEnd:int 	= strData.indexOf(" {",iStart);		// 从关键字开始 第一个 “｛”
+					
+					if( strKey == "TexAColor ")
+						strTemp = strData.substring(iStart+strKey.length,iEnd);
+					else
+						strTemp = strData.substring(iStart+strKey.length+1,iEnd);
+					
+					if( strKey == "GeomStaticMesh" )
+					{			
+						strData = strData.split(strTemp).join(strNewName);
+					}
+					else if( strKey == "MtlMulti")
+					{
+						strData = strData.split(strTemp).join(strNewName+"Mat");
+						m_bMtlMulti = true;
+					}
+					else if( strKey == "MtlSingleBRDF" )
+					{
+						var uuid:String = GenerateUUID();
+						if( m_bMtlMulti == true )
+							strData = strData.split(strTemp).join(strNewName+"_"+uuid);
+						else
+							strData = strData.split(strTemp).join(strNewName+"Mat");
+					}
+					else
+					{		
+						var uuid:String = GenerateUUID();
+						strData = strData.split(strTemp).join(strNewName+"_"+uuid);
+					}
+					
+					iStartOld = iStart+1;
+					iStart = strData.indexOf(strKey,iStartOld);
+				}
+ 				
+				return strData; 
+			}
+			
+			public function ChangeFilePath(strData:String, strPath:String):String
+			{
+				var strTemp:String;
+				
+				var iStartOld:int = 0;			
+				var iStart:int = strData.indexOf("file=\"",iStartOld);
+				while( iStart != -1 )
+				{
+					var iEnd:int = strData.indexOf("\";",iStart);	// 从关键字开始 第一个 “｛”
+					strTemp = strData.substring(iStart,iEnd);
+					
+					var iCount:int = strTemp.lastIndexOf("\\");
+					if( iCount == -1 ) //  file="366com-12.jpg" 这类情况
+					{
+						iCount = strTemp.lastIndexOf("=");
+					}
+					var strFileName:String = strTemp.slice(iCount+1); 
+
+					
+					strData =strData.replace(strTemp,"file=\""+strPath+"\\"+strFileName);	
+					iStartOld = iStart+1;
+					iStart = strData.indexOf("file=\"",iStartOld);
+				}
+				
+				return strData;				
+			}
+			
+			public var m_strData:String;
+			public function endUpload(e:Event):void
+			{
+				fileVRScene.removeEventListener(Event.COMPLETE,endUpload);					
+				
+				var iIndex:int = fileVRScene.name.lastIndexOf(".");
+				var strTitle:String = fileVRScene.name.slice(0,iIndex);	
+				
+				var strUUIDArray:Array = strTitle.split("-");
+				
+				// *.去掉名称中的"-"
+				var strNewName:String = strUUIDArray[0];
+				for(var i:int = 1; i<strUUIDArray.length; i++)
+				{
+					strNewName+=strUUIDArray[i];
+				}
+
+				m_strData = e.target.data;
+				
+				// 去掉GeomStaticMesh 之前的内容
+				var iCount:int = m_strData.indexOf("GeomStaticMesh ");
+				m_strData = m_strData.slice(iCount);
+				
+				// *.去掉Node 后面的所有内容
+				var iStart:int 	= m_strData.indexOf("Node ");
+				var iEnd:int	= m_strData.indexOf("}",iStart);
+				var str1:String	= m_strData.slice(0,iStart);
+				var str2:String	= m_strData.slice(iEnd+1);
+				
+				m_strData = str2;
+			//	m_strData = str1 +str2;
+				// 去掉 SettingsEnvironment 之后的内容
+				iStart 		= m_strData.indexOf("SettingsEnvironment");
+				m_strData	= m_strData.slice(0,iStart);
+				
+				if( str1.indexOf(strNewName) != -1 )
+				{
+					m_iHouse.mHelpDialog.show("此vrscene已经转换过,不能再次转换.");
+					return;
+				}
+				
+				str1 = ChangeWord(str1,"GeomStaticMesh",strNewName);
+
+ 				// *. 替换关键字为唯一名称
+				for( var j:int = 0; j<m_strKeyWordArray.length; j++ )
+					m_strData = ChangeWord(m_strData,m_strKeyWordArray[j],strNewName);
+				
+				// *. 替换文件路径
+				m_strData = ChangeFilePath(m_strData,m_strPath); 
+				
+				m_strData = str1 +m_strData;
+				
+				/*
+				//保存新的VRSCENE
+				iIndex = fileVRScene.nativePath.lastIndexOf("\\");
+				var strPathAll:String = fileVRScene.nativePath.slice(0,iIndex+1);	// 文件路径
+				var strPathFile:String = strPathAll +strUUID+"_new.vrscene";
+				
+				var file:File=new File();
+				file.nativePath=strPathFile;
+				
+				var fs:FileStream=new FileStream();
+				fs.open(file, FileMode.WRITE);
+				fs.position=0;
+				fs.endian=Endian.LITTLE_ENDIAN; //高低位互换	
+				fs.writeMultiByte(strData,"GB2312");
+				fs.close();
+				*/
+				m_bMtlMulti = false;
+				m_iHouse.mHelpDialog.show("转换完成!");
+			}				
+			
+			public  function OnClose():void
+			{
+				this.visible = false;
+
+			}
+			
+			public function OnSave():void
+			{
+				var file:FileReference = new FileReference();
+					file.save(m_strData,"rename.vrscene"); 				
+			}
+			
+			//strVRSceneFileData:原vrscene文件内容   strReplacePath：原来vrscene贴图要要被替换掉的路径
+			public function ChangeVRSceneFilePath(strVRSceneFileName:String,strVRSceneFileData:String,strReplacePath:String):void
+			{
+				var iIndex:int = strVRSceneFileName.lastIndexOf(".");
+				var strTitle:String = strVRSceneFileName.slice(0,iIndex);	
+				
+				var strUUIDArray:Array = strTitle.split("-");
+				
+				// *.去掉名称中的"-"
+				var strNewName:String = strUUIDArray[0];
+				for(var i:int = 1; i<strUUIDArray.length; i++)
+				{
+					strNewName+=strUUIDArray[i];
+				}
+				
+				// 去掉GeomStaticMesh 之前的内容
+				var iCount:int = strVRSceneFileData.indexOf("GeomStaticMesh ");
+				strVRSceneFileData = strVRSceneFileData.slice(iCount);
+				
+				// *.去掉Node 后面的所有内容
+				var iStart:int 	= strVRSceneFileData.indexOf("Node ");
+				var iEnd:int	= strVRSceneFileData.indexOf("}",iStart);
+				var str1:String	= strVRSceneFileData.slice(0,iStart);
+				var str2:String	= strVRSceneFileData.slice(iEnd+1);
+				
+				strVRSceneFileData = str2;
+				iStart 		= strVRSceneFileData.indexOf("SettingsEnvironment");
+				strVRSceneFileData	= strVRSceneFileData.slice(0,iStart);
+					
+				str1 = ChangeWord(str1,"GeomStaticMesh",strNewName);
+				
+				// *. 替换关键字为唯一名称
+				for( var j:int = 0; j<m_strKeyWordArray.length; j++ )
+					strVRSceneFileData = ChangeWord(strVRSceneFileData,m_strKeyWordArray[j],strNewName);
+				
+				// *. 替换文件路径
+				strVRSceneFileData = ChangeFilePath(strVRSceneFileData,m_strPath); 
+				
+				strVRSceneFileData = str1 +m_strData;
+				m_bMtlMulti = false;
+			}
+	
+		]]>
+	</fx:Script>	
+	<fx:Declarations>
+		<mx:Blur id="blurOn" blurXFrom="0.0" blurXTo="10.0" blurYFrom="0.0" blurYTo="10.0"/>
+		<mx:Blur id="blurOut" blurXFrom="10.0" blurXTo="0.0" blurYFrom="10.0" blurYTo="0.0"/>
+	</fx:Declarations>
+	
+	<s:Rect x="-1000" y="-1000" width="5000" height="5000" alpha="0.5">
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>
+	<s:Group left="10" right="35" top="20" height="45" mouseDown="this.startDrag();" mouseUp="this.stopDrag()"/>
+		
+	<s:Group left="0" right="0" top="0" bottom="0" >
+		
+		<s:Rect right="20" top="20" left="10" bottom="8" radiusX="5">
+			<s:fill>
+				<s:SolidColor color="#ffffff"/>
+			</s:fill>		
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="8" blurY="8" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 		
+		</s:Rect>	
+		<s:Rect right="0" top="0" width="35" height="35" radiusX="45">
+			<s:stroke>
+				<s:SolidColorStroke color="#ffffff" caps="none" weight="3" joints="miter" miterLimit="4"/>
+			</s:stroke>	
+			<s:fill>
+				<s:SolidColor color="#000000"/>
+			</s:fill>
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="4" blurY="4" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 	
+		</s:Rect>
+		<s:Label x="200"  y="30" fontFamily="宋体" fontSize="25" text="vrscene模型转换"/>
+		<s:Rect right="33"  left="22" top="65">
+			<s:stroke>
+				<s:SolidColorStroke color="#dddddd" caps="none" weight="2" joints="miter" miterLimit="1"/>
+			</s:stroke>			
+		</s:Rect>
+		
+		<s:Image right="8" top="10"  source="@Embed('/assets/close.png')" 
+				 mouseDownEffect="{blurOn}" mouseUpEffect="{blurOut}"
+				 buttonMode="true" click="OnClose();" />		
+	<s:Label x="36" y="95" fontFamily="宋体" fontSize="16" text="第一步: 模型转换路径"/>
+	<s:TextInput id="m_dataText" x="210" y="93" width="389"
+				 text="data\jiaju\kct\chaji\bianji\KT-bianji2015126\vrscene"/>
+	<s:Button x="27" y="154" width="197" height="33" label="第二步: 选择模型并转换" click="ChangeVRScene();"
+			  fontFamily="宋体" fontSize="16" skinClass="Skins.CommonButton"/>
+		<s:Button x="277" y="154" width="197" height="33" label="第三步: 保存到本地" click="OnSave();"
+				  fontFamily="宋体" fontSize="16" skinClass="Skins.CommonButton"/>
+
+	</s:Group>	
+
+</s:Group>

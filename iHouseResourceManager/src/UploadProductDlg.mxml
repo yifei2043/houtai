@@ -1,0 +1,404 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="500" height="480" fontFamily="宋体"
+		 fontSize="26" fontStyle="italic" fontWeight="bold">
+	
+	<fx:Script>
+		<![CDATA[	
+			import com.google.zxing.client.result.BookmarkDoCoMoResultParser;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.UIComponent;
+			import mx.events.IndexChangedEvent;
+			import mx.rpc.AbstractOperation;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.InvokeEvent;
+			import mx.rpc.events.ResultEvent;
+			import spark.events.IndexChangeEvent;
+			
+			public var m_iHouse:iHouseResourceManager;
+			private var strProductID:String;
+			
+			private var strCode:String  = "";   //代码
+			private var strName:String  = "";   //名称
+			private var strNorms:String = "";   //规格
+			private var strType:String  = "";   //类型
+			private var strPrice:String = "";   //价格
+			private var strUnit:String  = "";   //单位
+			private var strMarketPrice:String = "";  //市场价格
+			private var strRemark:String = "" ;      //备注
+			
+			private var bGetProductInfo:Boolean = false;
+			public var strOperationType:String ="0"; //增加类型 "0",为模型  "1"为贴图
+			private var m_iCalcType:int = 0;    //0:平方 1:周长  2:个  3：宽X高   4：宽X深  5:体积
+			
+			private var strIconPath:String;
+			private var CalcTypeGroup:ArrayCollection	= new ArrayCollection();
+						
+			public function Show(productID:String,iconPath:String):void
+			{
+				ClearData();
+				
+				CalcTypeGroup.addItem({label:"平方"});
+				CalcTypeGroup.addItem({label:"周长"});
+				CalcTypeGroup.addItem({label:"个"});
+				CalcTypeGroup.addItem({label:"宽X高"});
+				CalcTypeGroup.addItem({label:"宽X深"});
+				CalcTypeGroup.addItem({label:"体积"});
+				mCalcType.selectedIndex = 0;
+				
+				strProductID = productID;
+				strIconPath = iconPath;
+				
+				bGetProductInfo = false;
+				strOperationType = strType;
+				this.visible = true;
+				
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("GetProduct");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnGetResult);
+				m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnGetFault);
+				
+				//获取商品信息
+				op.send(strProductID);
+			}
+			
+			//清空界面控件数据
+			private function ClearData():void
+			{
+				CalcTypeGroup.removeAll();
+				
+				//通过反射机制取出当前MXML中的信息  
+				var instanceInfo:XML=describeType(this); 
+				var properties:XMLList =instanceInfo..accessor.(@type=="spark.components::TextInput")      
+				
+				for each(var propertyInfo:XML in properties)
+				{  
+					//此处取出的为control的id     
+					var propertyName:String =propertyInfo.@name;
+					TextInput(this[propertyName]).text="";  
+				}
+				
+				mTextRemark.text = "";
+			}
+			
+			private function Check():Boolean
+			{
+				strName = mTextName.text;   //名称
+				strCode = mTextCode.text;   //编程
+				strNorms = mTextNorms.text;  //规格
+				strType = mTextType.text;   //类型
+				strPrice = mTextPrice.text;  //价格
+				strUnit = mTextUnit.text;    //单位
+				strMarketPrice = mTextMarketPrice.text;  //市场价格
+				strRemark = mTextRemark.text ;           //备注
+				
+				if("" == strName)
+				{
+					m_iHouse.mAlertDialog.show("名称不能为空!");
+					return false;
+				}
+				
+				if("" == strPrice)
+				{
+					m_iHouse.mAlertDialog.show("价格不能为空!");
+					return false;
+				}
+				
+				if("" == strMarketPrice)
+				{
+					m_iHouse.mAlertDialog.show("市场价格不能为空!");
+					return false;
+				}
+				
+/* 				
+				if("" == strNorms)
+				{
+					m_iHouse.mAlertDialog.show("不能为空!");
+					return false;
+				}
+				
+				if("" == strType)
+				{
+					m_iHouse.mAlertDialog.show("不能为空!");
+					return false;
+				} 
+				
+				if("" == strCode)
+				{
+					m_iHouse.mAlertDialog.show("编码不能为空!");
+					return false;
+				}
+
+ 				if("" == strUnit)
+				{
+					m_iHouse.mAlertDialog.show("不能为空!");
+					return false;
+				} 
+				
+				if("" == strRemark)
+				{
+					m_iHouse.mAlertDialog.show("不能为空!");
+					return false;
+				} */
+				
+				
+				return true;
+			}
+
+			protected function OnAdd(event:MouseEvent):void
+			{
+				if(!Check())
+					return;
+				
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("AddProduct");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnAddResult);
+				m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnAddFault);
+				op.send(strProductID,
+					    strIconPath,     //icon
+				        strCode ,        //代码
+					    strName ,        //名称
+						strNorms,   	 //规格
+						strType ,   	 //类型
+						strPrice,   	 //价格
+						strUnit ,  	 	 //单位
+						strMarketPrice,  //市场价格
+						strRemark,       //备注
+						m_iCalcType.toString()); //计算方式
+				
+			}
+			
+			protected function OnUpdate(event:MouseEvent):void
+			{
+				if(!Check())
+					return;
+									
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("UpdateProduct");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnUpdateResult);
+				m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnUpdateFault);
+				op.send(strProductID,
+						strCode ,   //代码
+						strName ,   //名称
+						strNorms,   //规格
+						strType ,   //类型
+						strPrice,   //价格
+						strUnit ,   //单位
+						strMarketPrice,  //市场价格
+						strRemark,       //备注
+						m_iCalcType.toString()); //计算方式
+			}
+			
+			public function OnNewFile_No():void
+			{			
+			}   
+			
+			public function OnNewFile_Yes():void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("DeleteProduct");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnDeleteResult);
+				m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnDeleteFault);
+				op.send(strProductID);				
+			}
+			
+			protected function OnDelete(event:MouseEvent):void
+			{
+				m_iHouse.mYesNoDialog.mYes.label = "确定";  
+				m_iHouse.mYesNoDialog.mNo.label  = "取消";
+				m_iHouse.mYesNoDialog.show("是否删除",OnNewFile_Yes,OnNewFile_No);	
+			}
+			
+			private function OnGetResult(event:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnGetResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnGetFault);
+				
+				var strData:String = event.result.toString();
+				var strArray:Array = strData.split("#");
+				
+                if(strArray.length > 1)
+				{	var strUser:String = strArray[1];
+					
+					var strUserArray:Array = strUser.split("~");
+					if(0 == strUserArray.length)
+						return;
+					
+					mTextCode.text =strUserArray[0];  //代码
+					mTextName.text =strUserArray[1];  //名称
+					mTextNorms.text =strUserArray[2]; //规格
+					mTextType.text =strUserArray[3];  //类型
+					mTextPrice.text =strUserArray[4]; //价格
+					mTextUnit.text =strUserArray[5];  //单位
+					mTextMarketPrice.text =strUserArray[6];  //市场价格
+					mTextRemark.text =strUserArray[7];       //备注
+					mCalcType.selectedIndex = int(strUserArray[8]);
+										
+					bGetProductInfo = true;  //有取到产品数据
+				}
+				
+				mAdd.visible = !bGetProductInfo;
+				mUpdate.visible = bGetProductInfo;
+				mDelete.visible = bGetProductInfo;
+			}
+			
+			private function OnGetFault(event:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnGetResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnGetFault);
+				
+				m_iHouse.mHelpDialog.show("获取产品失败,失败原因:"+event.toString());
+			}
+			
+			private function OnAddResult(event:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnAddResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnAddFault);
+				
+				m_iHouse.mAlertDialog.show("增加成功!");
+				visible = false;
+			}
+			
+			private function OnAddFault(event:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnAddResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnAddFault);
+				
+				m_iHouse.mAlertDialog.show("增加失败,失败原因：" + event.toString());
+			}
+			
+			private function OnUpdateResult(event:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2..removeEventListener(ResultEvent.RESULT,OnUpdateResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnUpdateFault);
+				
+				m_iHouse.mAlertDialog.show("更新成功!");
+				visible = false;
+			}
+			
+			private function OnUpdateFault(event:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2..removeEventListener(ResultEvent.RESULT,OnUpdateResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnUpdateFault);
+				
+				m_iHouse.mAlertDialog.show("更新失败,失败原因：" + event.toString());
+			}
+			
+			private function OnDeleteResult(event:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnDeleteResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnDeleteFault);
+				
+				m_iHouse.mAlertDialog.show("删除成功!");
+				visible = false;
+			}
+			
+			private function OnDeleteFault(event:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnDeleteResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnDeleteFault);
+				
+				m_iHouse.mAlertDialog.show("删除失败,失败原因：" + event.toString());
+			}		
+			
+			public  function OnClose():void
+			{
+				this.visible = false;  
+			}	
+			
+			protected function OnChange(event:IndexChangeEvent):void
+			{
+				m_iCalcType = mCalcType.selectedIndex;
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<mx:Blur id="blurOn" blurXFrom="0.0" blurXTo="10.0" blurYFrom="0.0" blurYTo="10.0"/>
+		<mx:Blur id="blurOut" blurXFrom="10.0" blurXTo="0.0" blurYFrom="10.0" blurYTo="0.0"/>
+	</fx:Declarations>	
+	<s:Rect x="-1000" y="-1000" width="5000" height="5000" alpha="0.5">
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>		
+	<s:Group left="0" right="10" top="0" bottom="0" >
+		<s:Group left="10" right="35" top="20" height="45" mouseDown="this.startDrag();" mouseUp="this.stopDrag()"/>	
+			<s:Rect right="0" top="5" left="5" bottom="5" radiusX="5">
+			<s:fill>
+				<s:SolidColor color="#ffffff"/>
+			</s:fill>		
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="8" blurY="8" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 		
+		</s:Rect>	
+		<s:DropDownList id="mCalcType" x="320" y="228" width="142" height="23" change="OnChange(event)"
+						dataProvider="{CalcTypeGroup}" fontFamily="宋体" fontSize="16" fontStyle="normal"
+						fontWeight="normal"/>
+		<s:Label id="mLabelCalType" x="250" y="235" fontFamily="宋体" fontSize="14" fontStyle="normal" fontWeight="normal" text="计算类型:"/>
+		<s:Rect left="32" right="41" top="69" height="-1">
+			<s:stroke>
+				<s:SolidColorStroke color="#dddddd" caps="none" weight="2" joints="miter" miterLimit="1"/>
+			</s:stroke>			
+		</s:Rect>
+		<s:Button id="mAdd" left="102" bottom="28" width="67" height="23" label="增加"
+				  click="OnAdd(event)" fontFamily="宋体" fontSize="16" fontStyle="normal"
+				  fontWeight="normal" skinClass="Skins.CommonButton" tabIndex="9"/>
+		<s:Button id="mUpdate" left="183" bottom="28" width="67" height="23" label="更新"
+				  click="OnUpdate(event)" fontFamily="宋体" fontSize="16" fontStyle="normal"
+				  fontWeight="normal" skinClass="Skins.CommonButton" tabIndex="10"/>
+		<s:Button id="mDelete" left="266" bottom="28" width="67" height="23" label="删除"
+				  click="OnDelete(event)" fontFamily="宋体" fontSize="16" fontStyle="normal"
+				  fontWeight="normal" skinClass="Skins.CommonButton" tabIndex="11"/>
+		
+		<s:Label id="mTitle1" left="25" top="32"  fontFamily="宋体"  fontSize="26" text="产品信息" visible="true"/>
+		<s:Button id="mEffect2" right="75" bottom="28" width="67" height="23" label="关闭"
+				  click="OnClose()" fontFamily="宋体" fontSize="16" fontStyle="normal"
+				  fontWeight="normal" skinClass="Skins.CommonButton" tabIndex="12"/>
+		
+		<s:Label left="54" top="92" text="名称：" fontFamily="宋体" fontSize="14" fontStyle="normal" fontWeight="normal"/>
+		<s:Label left="54" top="283" text="备注：" fontFamily="宋体" fontSize="14" fontStyle="normal" fontWeight="normal"/>
+		<s:Label left="270" top="188" text="单位：" fontFamily="宋体" fontSize="14" fontStyle="normal" fontWeight="normal"/>
+		<s:Label left="270" top="141" text="型号：" fontFamily="宋体" fontSize="14" fontStyle="normal" fontWeight="normal"/>
+		<s:Label left="270" top="92" text="编码：" fontFamily="宋体" fontSize="14" fontStyle="normal" fontWeight="normal"/>
+		<s:Label left="54" top="141" text="规格：" fontFamily="宋体" fontSize="14" fontStyle="normal" fontWeight="normal"/>
+		<s:Label left="54" top="188" text="单价：" fontFamily="宋体" fontSize="14" fontStyle="normal" fontWeight="normal"/>
+		<s:Label left="38" top="236" text="市场价：" fontFamily="宋体" fontSize="14" fontStyle="normal" fontWeight="normal"/>
+		<s:TextInput id="mTextName" left="97" top="89" width="144" height="26" fontFamily="宋体"
+					 fontSize="15" fontStyle="normal" fontWeight="normal" tabIndex="1"/>
+		<s:TextInput id="mTextNorms" left="97" top="137" width="144" height="26" fontFamily="宋体" fontSize="15"
+					 fontStyle="normal" fontWeight="normal" tabIndex="3"/>
+		<s:TextInput id="mTextCode" left="318" top="87" width="144" fontFamily="宋体" fontSize="15"
+					 fontStyle="normal" fontWeight="normal" tabIndex="2"/>
+		<s:TextInput id="mTextPrice" left="97" top="184" width="144" height="26" fontFamily="宋体"
+					 fontSize="15" fontStyle="normal" fontWeight="normal" tabIndex="5" restrict="0-9\."/>
+		<s:TextInput id="mTextMarketPrice" left="97" top="231" width="144" height="26" fontFamily="宋体"
+					 fontSize="15" fontStyle="normal" fontWeight="normal" tabIndex="7" restrict="0-9\."/>
+		<s:TextInput id="mTextType" left="318" top="141" width="144" fontFamily="宋体" fontSize="15"
+					 fontStyle="normal" fontWeight="normal" tabIndex="4"/>
+		<s:TextInput id="mTextUnit" left="318" top="188" width="144" fontFamily="宋体" fontSize="15"
+					 fontStyle="normal" fontWeight="normal" tabIndex="6"/>
+		<s:TextArea id="mTextRemark" left="97" top="279" width="364" height="130" fontFamily="宋体" fontSize="15"
+					 fontStyle="normal" fontWeight="normal" tabIndex="8"/>
+		
+		
+	</s:Group>		
+	<s:Rect right="-5" top="-8" width="35" height="35" radiusX="45">
+		<s:stroke>
+			<s:SolidColorStroke color="#ffffff" caps="none" weight="3" joints="miter" miterLimit="4"/>
+		</s:stroke>	
+		<s:fill>
+			<s:SolidColor color="#000000"/>
+		</s:fill>
+		<s:filters>
+			<s:DropShadowFilter angle="0" blurX="4" blurY="4" color="#888888"
+								distance="0" hideObject="false" inner="false" knockout="false"
+								quality="2" strength="1"/>
+		</s:filters> 	
+	</s:Rect>
+	<s:Image right="4" top="2"  source="@Embed('/assets/close.png')" 
+			 mouseDownEffect="{blurOn}" mouseUpEffect="{blurOut}"
+			 buttonMode="true" click="OnClose();" />
+</s:Group>
+

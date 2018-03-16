@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 xmlns:local="*" 
+		 xmlns:UI="UI.*">
+	
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.protocols.dict.Dict;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.ListEvent;
+			import mx.rpc.AbstractOperation;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			
+			public var RecordGroup:ArrayCollection = new ArrayCollection();
+			public var m_iHouse:iHouseUserManager;
+
+			var LoginDicScheme:Dictionary = new Dictionary();
+			var strXMLData:String = "";
+			
+			
+			/******************** 获得用户列表 ********************/
+			private function GetLoginInfoList():void
+			{
+				LoginDicScheme = new Dictionary();
+				RecordGroup.removeAll();
+				mUserInfo.dataProvider = RecordGroup;
+				strXMLData = "";
+
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("GetLoginInfoList");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnError);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnResult);
+				op.send(m_iHouse.mStrCompanyID,m_iHouse.mStrAccountType); 
+			}
+			//获得用户列表 失败事件
+			private function OnError(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResult);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试.");	 
+			}	
+			//获得用户列表 成功事件
+			public function OnResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResult);
+				
+				var str:String = e.result.toString();
+				var strArray:Array = str.split("#");
+				
+				for( var i:int = 0;i<strArray.length; i++ )  
+				{
+					var strRecord:String = strArray[i];
+					var strRecordArray:Array = strRecord.split("~");
+					
+						
+					if( strRecordArray[0] == "1" )
+						continue;
+					
+					if( strRecordArray[5] == "2" )	// 已逻辑删除账号
+						continue;
+					
+					
+					var strIPAddress:String = strRecordArray[2];
+					var strIPAndAddressList:Array = strIPAddress.split(",");
+					var strCompanyID:String = strRecordArray[4];
+					var strUserAccount:String = strRecordArray[0];
+					
+					
+					//保存所有用户登录信息,用于初始显示所有帐号登录信息
+					RecordGroup.addItem({   dataName:strUserAccount, 
+											dataCompany:strRecordArray[1], 
+											dataIP:strIPAndAddressList[0],
+											dataAddress:strIPAndAddressList[1],
+											dataLoginTimer:strRecordArray[3],
+											dataCompanyID:strCompanyID
+					                    });
+					
+										
+					if(false == LoginDicScheme.hasOwnProperty(strCompanyID))
+					{
+						LoginDicScheme[strCompanyID] = new Dictionary();
+					}
+					
+					if(false == LoginDicScheme[strCompanyID].hasOwnProperty(strUserAccount))
+					{
+						LoginDicScheme[strCompanyID][strUserAccount] = new Array();
+					}
+					
+					//保存为：公司ID=公司下所有用户，用于过滤对应公司下用户登录信息
+					LoginDicScheme[strCompanyID][strUserAccount].push({ dataName:strUserAccount, 
+																		dataCompany:strRecordArray[1], 
+																		dataIP:strIPAndAddressList[0],
+																		dataAddress:strIPAndAddressList[1],
+																		dataLoginTimer:strRecordArray[3],
+																		dataCompanyID:strCompanyID});	
+				}
+				
+				SetLoginInfoToTree();
+			}
+			
+			/************************************************/
+			
+			
+			/******************** 获得筛选用户 ********************/
+			//用户名加入树
+			public function SetLoginInfoToTree():void
+			{
+				var strXMLData:String = "<root>";
+				for(var companyID:String in LoginDicScheme)
+				{
+					var dicUserInfo:Dictionary = LoginDicScheme[companyID];
+					
+					var companyAdded:Boolean = false;
+					
+					//用户节点
+					for(var userName:String in dicUserInfo)
+					{
+						if(false == companyAdded)
+						{
+							//公司节点
+							strXMLData += "<Class userName=\"" + dicUserInfo[userName][0].dataCompany +"\"" + " companyNode=\"" + 1 +"\"" + " companyID=\"" +companyID + "\">\r\n";
+
+							companyAdded = true;
+						}
+						
+						strXMLData += "<Class userName=\"" + userName +"\"" + " companyNode=\"" + 0 +"\""+ " companyID=\"" +companyID + "\"/>\r\n";
+					}
+					
+					//标识为公司节点下所有用户
+					//strXMLData += "<Class userName=\"显示所有用户\" + "companyID=\"" +companyID + "\"/>\r\n";
+					strXMLData += "</Class>";
+				}
+				
+				strXMLData += "</root>";
+				
+				var xmdData:XML =new XML(strXMLData);
+				mUserAccountTree.dataProvider = new XMLList(xmdData.Class);
+			}
+	
+			//点击树操作
+			public function OnChange(event:ListEvent):void			
+			{
+				var selectedNode:XML= Tree(event.target).selectedItem as XML; 
+				if(null == selectedNode)
+					return;
+				
+				var strUserName:String = selectedNode.@userName;
+				var strCompanyID:String = selectedNode.@companyID;
+				var strCompanyNode = selectedNode.@companyNode;
+				
+				
+				RecordGroup.removeAll();
+				mUserInfo.dataProvider = RecordGroup;
+				
+				//公司节点
+				if("1" == strCompanyNode)
+				{
+					var dicAllUser:Dictionary = LoginDicScheme[strCompanyID];
+					
+					for(var userName:String in dicAllUser)
+					{
+						for (var index:uint = 0; index < (dicAllUser[userName] as Array).length; ++index)
+						{
+							RecordGroup.addItem(dicAllUser[userName][index]);
+						}
+					}
+					
+				}
+				//用户节点
+				else if("0" == strCompanyNode)
+				{
+					var dicAllUser:Dictionary = LoginDicScheme[strCompanyID];
+					
+					for (var index:uint = 0; index < (dicAllUser[strUserName] as Array).length; ++index)
+					{
+						RecordGroup.addItem(dicAllUser[strUserName][index]);
+					}
+				}
+			}
+			
+			/********************************************/
+			
+			
+			//显示函数
+			public function Show():void
+			{
+				GetLoginInfoList();
+				this.visible = true;
+			}
+			//关闭
+			public function OnClose():void{
+				this.visible = false;
+			}
+			
+			protected function OnReturn(event:MouseEvent):void
+			{
+				visible = false;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<!--特效-->
+	<fx:Declarations>
+		<mx:Blur id="blurOn" blurXFrom="0.0" blurXTo="10.0" blurYFrom="0.0" blurYTo="10.0"/>
+		<mx:Blur id="blurOut" blurXFrom="10.0" blurXTo="0.0" blurYFrom="10.0" blurYTo="0.0"/>
+	</fx:Declarations>	
+	
+	
+	<!--背景-->
+	<s:Rect x="-1000" y="-1000" width="5000" height="5000" alpha="0.5">
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>
+
+	<!--下框-->
+	<s:Rect left="1" bottom="0" right="1" height="54" >
+		<s:fill>
+			<s:SolidColor color="#191B21"/>
+		</s:fill>
+	</s:Rect>	
+	
+	<!--树型图-->
+	<mx:Tree id="mUserAccountTree" left="1" top="0" bottom="54" width="150" labelField="@userName" defaultLeafIcon="@Embed(source='/assets/UserAccout.png')" change="OnChange(event)" ></mx:Tree>
+
+	<!--list表-->
+	<s:DataGrid id="mUserInfo" visible="true" left="150"  top="0" right="1" bottom="54"
+				dataProvider="{RecordGroup}" fontFamily="宋体" fontSize="15" requestedRowCount="5">
+		<s:columns>
+			<s:ArrayList>
+				<s:GridColumn dataField="dataName"    width="{(this.width - 150)/5}"  headerText="用户名"></s:GridColumn>
+				<s:GridColumn dataField="dataCompany" 	  width="{(this.width - 150)/5}"  headerText="公司名称"></s:GridColumn>
+				<s:GridColumn dataField="dataIP" 	  width="{(this.width - 150)/5}"  headerText="IP地址"></s:GridColumn>
+				<s:GridColumn dataField="dataAddress" 	  width="{(this.width - 150)/5}"  headerText="登录位置"></s:GridColumn>
+				<s:GridColumn dataField="dataLoginTimer"   	width="{(this.width - 150)/5}" headerText="登录时间"></s:GridColumn>
+			
+			</s:ArrayList>
+		</s:columns>
+	</s:DataGrid>	
+	<s:Button left="{(this.width - 106)/2}" bottom="8" width="106" height="36" label="返回" click="OnReturn(event)"
+			  fontFamily="宋体" skinClass="Skins.NormalCreateBtnSkin"/>
+
+</s:Group>

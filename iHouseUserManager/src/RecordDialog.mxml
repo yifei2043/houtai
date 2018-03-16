@@ -1,0 +1,591 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="500" height="370" creationComplete="init()">
+	
+	<fx:Script>
+		<![CDATA[	
+			import com.adobe.crypto.MD5;
+			import com.adobe.serialization.json.*;
+
+			import flash.display3D.IndexBuffer3D;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.core.UIComponent;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.rpc.AbstractOperation;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.utils.StringUtil;
+			
+			import spark.events.IndexChangeEvent;
+			
+			public var m_iHouse:iHouseUserManager;	
+			public var m_strCompanyID:String;
+			public var m_strUserID:String;
+			
+			[Bindable]
+			public var mCompanyGroup:ArrayCollection = new ArrayCollection();
+			
+			public var mAccountTypeGroup:ArrayCollection = new ArrayCollection();
+			
+			public function init() : void
+			{	
+				//默认企业用户所有权限，设计师可以进一步设置权限只操作自己模型，普通用户只能查看
+				mAccountTypeGroup.addItemAt({accountType:"企业用户" , accountTypeValue:0,authority:"1"},0);
+				mAccountTypeGroup.addItemAt({accountType:"设计师"   , accountTypeValue:1,authority:"0"},1);
+				mAccountTypeGroup.addItemAt({accountType:"普通用户" , accountTypeValue:2,authority:"0"},2);
+				//{accountType:"超级管理员"  , accountTypeValue:11,authority:"1"});
+
+				mAccountType.dataProvider = mAccountTypeGroup;
+				
+				mAccountType.selectedIndex = 0;
+				
+				mAccountTypeObj = mAccountTypeGroup[0];
+			}
+						
+			public  function OnCloseDlg():void
+			{
+				this.visible = false;
+			}	
+			
+			public function OnChange():void
+			{
+			}
+			
+			public function OnAddShow():void
+			{
+				OnReset();
+				
+				this.m_Title.text="创建用户窗口";
+				mUserName.enabled = true;
+				mModifyPWD.visible = false;
+				this.psw1.enabled = true;
+				this.psw2.enabled = true;	
+				this.psw1.text = "";
+				this.psw2.text = "";
+				this.visible = true;
+				mAuthority.visible = false;
+				mButton.label ="创建";
+
+				var dataCurTime:Date =  new Date();
+				
+				var iYear:Number = dataCurTime.fullYear;
+				var iMonth:Number= dataCurTime.month;
+				var iDay:Number  = dataCurTime.day;
+				mTimeEnd.text =  dataCurTime.fullYear+"-"+(dataCurTime.month+2)+"-"+dataCurTime.date;
+			} 
+			
+			public function SetComboIndex(strCompanyID:String):void
+			{
+				//使用登录时的公司名称
+				var index:int = 0;
+				for each(var item in mCompanyGroup)
+				{
+					if(item.CompanyID == strCompanyID)
+					{  
+						mCombo.selectedIndex = index;
+						break;
+					}
+					
+					++index;
+				}
+			}
+			
+			public function OnModifyShow():void
+			{
+				this.m_Title.text="修改用户窗口";
+				mUserName.enabled = false;
+				mModifyPWD.visible = true;
+				mModifyPWD.selected= false;
+				this.psw1.enabled = false;
+				this.psw2.enabled = false;
+				this.psw1.text = "";
+				this.psw2.text = "";				
+				this.visible = true;
+				mButton.label ="修改";
+			}
+			
+			public function OnOK():void
+			{
+				if( mUserName.text.length <= 0)
+				{
+					m_iHouse.mHelpDialog.show("用户名不能为空");
+					return;
+				}
+				
+				if(  mTimeEnd.text.length <= 0)
+				{
+					m_iHouse.mHelpDialog.show("截止时间不能为空");
+					return;					
+				}
+				
+				if( m_iHouse.mUserView.GetVisTime(mTimeEnd.text)<=0	)
+				{
+					m_iHouse.mHelpDialog.show("截止时间无效为负数");
+					return;
+				}
+				
+				if( mButton.label =="修改")
+				{
+					if( this.mModifyPWD.selected == true )
+					{
+						if( psw1.text.length <=3 )
+						{
+							m_iHouse.mHelpDialog.show("密码不能小于5位!");
+							return;
+						}
+						if( psw1.text != psw2.text )
+						{
+							m_iHouse.mHelpDialog.show("两次输入密码不一致");
+							return;
+						}						
+					}
+					else
+					{
+						psw1.text = "";
+						psw2.text = "";
+					}
+					
+					OnModify();
+				}
+				else
+				{
+					if( psw1.text.length <=3 )
+					{
+						m_iHouse.mHelpDialog.show("密码不能小于5位!");
+						return;
+					}
+					
+					if( psw1.text != psw2.text )
+					{
+						m_iHouse.mHelpDialog.show("两次输入密码不一致");
+						return;
+					}
+						
+					OnAdd();
+				}
+			}
+			
+			public var objUserInfo:Object = null;
+			public function OnModify():void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("ModifyUser");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnError);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnResult);
+				
+				var strPSW:String = "";
+				if( psw1.text=="" )
+					strPSW="no";
+				else
+					//strPSW = com.adobe.crypto.MD5.hash(psw1.text);
+					strPSW =psw1.text;
+				
+				var index:int = mCombo.selectedIndex;
+				var strNewCompanyID:String = mCompanyGroup[index].CompanyID;
+					
+				//帐号类型:0 企业  1：设计师  2：普通用户
+				var accountType:int = mAccountTypeObj.accountTypeValue;
+				
+				//帐号权限： 0：不能删除相关操作 1：可以操作
+				var accountAuthority:String = mAccountTypeObj.authority;
+				
+				objUserInfo = {dataName:mUserName.text,companyID:strNewCompanyID,dataAdministrator:accountAuthority,dataQQ:mQQ.text,
+					           dataTel:mTel.text,dataTime1:mTimeEnd.text,accounttype:mAccountTypeObj.accountType};
+				
+				op.send(m_strUserID, strNewCompanyID,accountAuthority, mUserName.text, strPSW, mQQ.text, 
+					    mTel.text, mTimeEnd.text, mDesc.text,accountType,m_iHouse.mUserName,m_iHouse.mStrUserID);
+			}
+			
+			private function OnError(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResult);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试.");	 
+			}			
+			
+			public function OnResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResult);
+				
+				var jsonStr:String = e.result.toString();
+				var jsonObj:Object = com.adobe.serialization.json.JSON.decode(jsonStr); 
+				
+				//成功
+				if("1" == jsonObj.success && null != objUserInfo)
+				{
+					m_iHouse.mUserView.ItemUpdate(objUserInfo);
+					//OnModifyRecordList();
+				}
+				
+				this.visible = false;
+				m_iHouse.mAlertDialog.show(jsonObj.nofityMsg);
+
+				//m_iHouse.mHelpDialog.show("修改完成");
+			}	
+			
+			public function OnAdd():void  
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("AddUser");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnAddError);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnAddResult);
+					
+				var index:int = mCombo.selectedIndex;
+				var strCompanyID:String = mCompanyGroup[index].CompanyID;
+				
+				//帐号类型:0 企业  1：设计师  2：普通用户
+				var accountType:int = mAccountTypeObj.accountTypeValue;
+				
+				//帐号权限： 0：不能删除相关操作 1：可以操作
+				var accountAuthority:String = mAccountTypeObj.authority;
+				
+				//MD5
+				//var md5_password:String = com.adobe.crypto.MD5.hash(psw1.text);	
+				//op.send(strCompanyID, accountAuthority, mUserName.text,md5_password, mQQ.text, mTel.text, mTimeEnd.text, mDesc.text,accountType);
+				
+				op.send(strCompanyID, accountAuthority, mUserName.text,psw1.text, mQQ.text, mTel.text,
+					    mTimeEnd.text, mDesc.text,accountType,m_iHouse.mUserName,m_iHouse.mStrUserID);
+			}
+			
+			private function OnAddError(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnAddError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnAddResult);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试.");	 
+			}			
+			
+			public function OnAddResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnAddError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnAddResult);
+				
+				var jsonStr:String = e.result.toString();
+				var jsonObj:Object = com.adobe.serialization.json.JSON.decode(jsonStr); 
+				
+				if("0" == jsonObj.success)
+				{
+					m_iHouse.mHelpDialog.show(jsonObj.nofityMsg);
+					return;
+				}
+				
+				var iAccountType:int = Number(jsonObj.accountType);
+				var strAccountType:String = mAccountTypeGroup[iAccountType].accountType;
+
+				m_iHouse.mUserView.RecordGroup.addItem(
+														{
+															dataName:mUserName.text, 
+															dataQQ:mQQ.text, 
+															dataTel:mTel.text,
+															dataTime1:mTimeEnd.text,
+															dataUserID:jsonObj.userID,
+															dataTimeCout:m_iHouse.mUserView.GetVisTime(mTimeEnd.text)+"天",
+															dataFolder:m_iHouse.mUserView.m_strFolder,
+															dataDesc:mDesc.text,
+															accounttype:strAccountType
+													     }
+				                                      );
+				
+				m_iHouse.mHelpDialog.show("添加完成");    
+				
+				OnCloseDlg();
+				
+				//吉采公司特殊处理
+				if("jc" == m_iHouse.mDataProcess.mCompanyInfo)
+				{
+					var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("PostUserOperate");
+					m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnJCError);
+					m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnJCResult);
+					
+					var index:int = mCombo.selectedIndex;
+					var strCompanyID:String = mCompanyGroup[index].CompanyID;
+					
+					//帐号类型:0 企业  1：设计师  2：普通用户
+					var accountType:int = mAccountTypeObj.accountTypeValue;
+					
+					//帐号权限： 0：不能删除相关操作 1：可以操作
+					var accountAuthority:String = mAccountTypeObj.authority;
+					
+					//MD5
+					//var md5_password:String = com.adobe.crypto.MD5.hash(psw1.text);	
+					//op.send(strCompanyID, accountAuthority, mUserName.text,md5_password, mQQ.text, mTel.text, mTimeEnd.text, mDesc.text,accountType);
+					
+					var strTemp:String = "UserID={0}&UserName={1}&Password={2}&QQ={3}&Tel={4}&EnableTime={5}&CompanyID={6}" +
+						                 "&Authcode={7}&Permissions=0&textdesc={8}lasttime={9}&administrator={10}&accounttype={11}&" +
+										 "creater={12}&createrid={13}&accountname={14}";
+					
+					var sj:Date=new Date(); 
+					var strLastLoginTime:String = sj.fullYear.toString()+":"+sj.month.toString() + ":" + sj.date.toString() + "  " 
+						                          + sj.hours.toString()+":" + sj.minutes.toString()+":"+sj.seconds.toString();
+		
+					
+					var strUserInfo:String =  mx.utils.StringUtil.substitute(strTemp,
+						                                                     jsonObj.userID,
+																			 mUserName.text,
+																			 psw1.text,
+																			 mQQ.text,
+																			 mTel.text,
+																			 mTimeEnd.text,
+																			 strCompanyID,
+																			 accountAuthority,
+																			 mDesc.text,
+																			 strLastLoginTime,
+																			 m_iHouse.mStrAdministrator,
+																			 m_iHouse.mStrAccountType,
+																			 m_iHouse.mUserName,
+																			 m_iHouse.mStrUserID,
+																			 ""
+																		     );
+					
+					op.send("http://47.94.200.97/interface/user_add.php",strUserInfo);
+				}
+			}
+			
+			private function OnJCError(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnJCError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnJCResult);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试.");	 
+			}			
+			
+			public function OnJCResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnJCError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnJCResult);
+				
+				//1：成功 0：失败
+				var strResult:String = e.result.toString();
+			}
+			
+			public function OnPSW():void
+			{
+				if( this.mModifyPWD.selected == true )
+				{
+					psw1.enabled = true;
+					psw2.enabled = true;
+					psw1.text ="";
+					psw2.text ="";
+				}
+				else
+				{
+					psw1.enabled = false;
+					psw2.enabled = false;
+					psw1.text ="";
+					psw2.text ="";					
+				}
+			}
+
+			public function InsertCompanyInfo(strCompanyID:String,strCompanyName:String,strFolder:String):void
+			{
+	
+				mCompanyGroup.addItem({CompanyID:strCompanyID,    //公司ID
+					                   CompanyName:strCompanyName,//公司名称
+									   companyFolder:strFolder    //存放数据目录
+					                  });
+				
+				mCombo.dataProvider = mCompanyGroup;
+			}
+			
+			public function ModifyCompanyInfo(strCompanyID:String,strCompanyName:String):void
+		    {
+				var index:int = 0;
+				for each(var item:Object in mCompanyGroup)
+				{
+					if(item.CompanyID == strCompanyID)
+					{
+						mCompanyGroup[index].CompanyName = strCompanyName;
+						
+						//刷新界面
+						mCombo.dataProvider = mCompanyGroup;
+						mCombo.selectedIndex = index;
+					}
+					
+					++index;
+				}
+		    }
+			
+			public function RemoveCompanyInfo(strCompanyID:String):void
+			{
+				var index:int = 0;
+				for each(var item:Object in mCompanyGroup)
+				{
+					if(item.CompanyID == strCompanyID )
+					{
+						mCompanyGroup.removeItemAt(index);
+					}
+					
+					++index;
+				}
+				
+				mCombo.dataProvider = mCompanyGroup;
+			}
+			
+			//清除界面数据
+			public function OnReset():void
+			{
+				//通过反射机制取出当前MXML中的信息  
+				var instanceInfo:XML=describeType(this); 
+				var properties:XMLList =instanceInfo..accessor.(@type=="spark.components::TextInput")      
+				
+				for each(var propertyInfo:XML in properties)
+				{  
+					//此处取出的为control的id     
+					var propertyName:String =propertyInfo.@name;
+					
+					TextInput(this[propertyName]).text="";  
+				}
+				
+				//默认企业用户
+				mAccountType.selectedIndex = 0;
+				mAuthority.selected = false;
+			}
+			
+			public var mAccountTypeObj:Object = null;
+			protected function OnAccountTypeChange(event:IndexChangeEvent):void
+			{
+				var index:int = mAccountType.selectedIndex;
+				if(-1 == index)
+					return;
+				
+				mAccountTypeObj = mAccountTypeGroup[index];
+				mAuthority.visible = (mAccountTypeObj.accountTypeValue == "1") ? true : false;
+			}
+			
+			protected function OnAuthorityCheck(event:Event):void
+			{
+				//设置设计师是否可以操作自己模型
+				mAccountTypeObj.authority =  mAuthority.selected ? 1 : 0;
+			}
+			
+			public function GetAccountTypeIndex(strAccountType:String):int
+			{
+				for(var iIndex:int = 0; iIndex < mAccountTypeGroup.length; ++iIndex)
+				{
+					if(strAccountType == mAccountTypeGroup[iIndex].accountType)
+					{
+						mAccountTypeObj = mAccountTypeGroup[iIndex];
+						
+						return iIndex;
+					}
+				}
+				
+				return -1;
+			}
+			
+			public function SetUserInfo(userInfo:Object):void
+			{
+				m_strUserID    = userInfo.dataUserID;
+				m_strCompanyID = userInfo.companyID;
+				mUserName.text = userInfo.dataName;
+				mQQ.text	   = userInfo.dataQQ;
+				mTel.text	   = userInfo.dataTel;
+				mTimeEnd.text  = userInfo.dataTime1;
+				mDesc.text	   = userInfo.dataDesc;
+				
+				var accounttype:int = GetAccountTypeIndex(userInfo.accounttype);
+				mAccountType.selectedIndex = accounttype;
+				
+				//如果是设计师
+				if(1 == accounttype)
+				{
+					mAuthority.visible  = true;
+					mAuthority.selected =  ("1" == userInfo.dataAdministrator);
+				}
+				else
+				{
+					mAuthority.visible  = false;
+				}
+				
+				SetComboIndex(m_strCompanyID);
+				
+				OnModifyShow();
+			}
+			
+		]]>
+	</fx:Script>	
+	<s:Rect x="-1000" y="-1000" width="5000" height="5000" alpha="0.5">
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>
+	<s:Rect x="0.5" y="0.5" width="100%" height="100%">
+		<s:stroke>
+			<s:SolidColorStroke caps="none" color="#000000" joints="miter" miterLimit="4" weight="1"/>
+		</s:stroke>
+		<s:fill>
+			<s:SolidColor color="#444547"/>
+		</s:fill>
+		<s:filters>
+			<s:DropShadowFilter alpha="1" angle="45.0" blurX="15" blurY="15"
+								color="#000000" distance="0" hideObject="false" inner="false"
+								knockout="false" quality="2" strength="1"/>
+		</s:filters>
+	</s:Rect>
+	<s:Label x="20" y="163" color="#FFFFFF" fontFamily="宋体" fontSize="14" text="帐号类型:"/>
+	<s:Group x="1" y="1" width="100%" height="40" mouseDown="this.startDrag();" mouseUp="this.stopDrag()">
+		<s:Rect x="1" y="1" width="100%" height="40" >
+			<s:fill>
+				<s:SolidColor color="#191B21"/>
+			</s:fill>
+		</s:Rect>
+	</s:Group>			
+	<s:Rect x="1" y="39" width="100%" height="2">
+		<s:fill>
+			<s:SolidColor color="#000000"/>
+		</s:fill>
+	</s:Rect>
+	<s:Label x="86" y="12" width="300" color="#FAF9F9" fontFamily="宋体" fontSize="22" text="窗口"
+			 textAlign="center" id="m_Title" mouseEnabled="false" />	
+
+	<s:Group x="0" bottom="0" width="500" mouseDown="this.startDrag();" mouseUp="this.stopDrag()">
+		<s:Rect x="0" y="10" width="100%" height="58" >
+			<s:fill>
+				<s:SolidColor color="#191B21"/>
+			</s:fill>
+		</s:Rect>		
+		<s:Button id="mButton"  x="100" y="20" width="120" label="确定" buttonMode="true"
+				  click="OnOK();"
+				  skinClass="Skins.NormalCreateBtnSkin"/>
+		<s:Button  x="260" y="20" width="120" label="取消" buttonMode="true"
+				  click="OnCloseDlg();" visible="true"
+				  skinClass="Skins.NormalCreateBtnSkin"/>	
+	</s:Group>
+	<s:Label x="27" y="59" color="#FFFFFF" fontFamily="宋体" fontSize="16" text="用户名:"/>
+	<s:Label x="43" y="198" color="#FFFFFF" fontFamily="宋体" fontSize="16" text="电话:"/>
+	<s:Label x="288" y="199" height="16" color="#FFFFFF" fontFamily="宋体" fontSize="14" text="QQ:"/>
+	<s:Label x="11" y="233" color="#FFFFFF" fontFamily="宋体" fontSize="16" text="截止时间:"/>
+	<s:Label x="11" y="268" color="#FFFFFF" fontFamily="宋体" fontSize="16" text="描述信息:"/>
+	<s:Label x="259" y="235" color="#FFFFFF" fontFamily="宋体" fontSize="16" text="(必填)"/>
+	<s:Label x="344" y="59" width="130" color="#FFFFFF" fontFamily="宋体" fontSize="14" text="(必填 字母与数字)"/>
+	<s:TextInput id="mUserName" x="90" y="55" width="242" restrict="0-9ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"/>
+
+	<s:CheckBox x="347" y="90" id="mModifyPWD" label="修改密码" color="#FFFFFF" fontFamily="宋体" visible="true" change="OnPSW();"/>
+
+	<s:Label x="48" y="127" color="#FFFFFF" fontFamily="宋体" fontSize="14" text="密码:"/>
+	<s:TextInput id="psw1" displayAsPassword="true" x="90" y="123" width="134" restrict="0-9ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"/>
+	<s:Label x="248" y="127" color="#FFFFFF" fontFamily="宋体" fontSize="14" text="重复密码:"/>
+	<s:TextInput id="psw2" displayAsPassword="true" x="320" y="123" width="134" restrict="0-9ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"/>		
+
+	
+	<s:TextInput id="mTel" x="90" y="196" width="134"/>	
+	<mx:DateField id="mTimeEnd" x="90" y="230" width="158"  yearNavigationEnabled="true"
+		dayNames="['日','一','二','三','四','五','六']"
+		monthNames="['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月']"
+		formatString="YYYY-MM-DD" fontSize="12"/>
+	<s:TextInput id="mQQ" x="320" y="197" width="134"/>
+	<s:TextInput id="mDesc" x="90" y="266" width="380" fontFamily="宋体" />
+	<!--<s:CheckBox id="Administrator" x="323" y="236" label="管理员权限" fontFamily="宋体"  color="#FFFFFF" visible="false"/>-->
+	<s:ComboBox id="mCombo"  fontFamily="宋体" x="90" y="89" width="242" dataProvider="{mCompanyGroup}" labelField="CompanyName" creationComplete="mCombo.textInput.editable = false"/>
+	<s:Label x="11" y="90" text="公司名称:" color="#FFFFFF" fontFamily="宋体" fontSize="16"/>
+	<s:ComboBox id="mAccountType" x="89" y="158" width="135" change="OnAccountTypeChange(event)"
+				creationComplete="mCombo.textInput.editable = false"
+				dataProvider="{mAccountTypeGroup}" labelField="accountType" fontFamily="宋体"/>
+	
+	<s:CheckBox id="mAuthority" x="233" y="159" label="模型管理" click="OnAuthorityCheck(event)"
+				color="#FFFFFF" fontFamily="宋体" fontSize="14" visible="false"/>
+
+
+</s:Group>

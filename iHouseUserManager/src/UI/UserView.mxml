@@ -1,0 +1,543 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 xmlns:local="*"  >
+	
+	<fx:Script>
+		<![CDATA[	
+			import com.adobe.serialization.json.*;
+			import flashx.textLayout.elements.BreakElement;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Menu;
+			import mx.core.UIComponent;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.events.MenuEvent;
+			import mx.rpc.AbstractOperation;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			public var m_iHouse:iHouseUserManager;
+			
+			public var m_strCurrentCompanyID:String; //选择Tree时公司ID
+			public var m_strSysUser:String;
+			public var m_strFolder:String;			
+			
+			[Bindable]
+			 public var RecordGroup:ArrayCollection   =new ArrayCollection();
+			
+		    [Bindable] 
+			public var CompanyGroup:ArrayCollection   =new ArrayCollection();
+			
+			
+			private var menuTree:Menu;
+						
+			public function init():void
+			{
+				mRecordDialog.m_iHouse	= m_iHouse;	
+
+				var menuItems:Array = new Array();				
+				menuTree = Menu.createMenu(this, menuItems, false);
+				menuTree.variableRowHeight = true; 
+				menuTree.addEventListener(MenuEvent.ITEM_CLICK, tree_MenuItemSelected);  //右键菜单的事件
+				mCompanyTree.addEventListener(MouseEvent.RIGHT_CLICK,treeRightClick);
+				mCompanyTree.addEventListener(MouseEvent.CLICK,treeClick);
+			}
+			
+			/***
+			 * 得到用户列表
+			 * 
+			 */
+			public function GetUserList():void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("GetUserList");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnError);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnResult);
+				op.send(m_iHouse.mStrCompanyID); 
+			}
+			
+			private function OnError(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResult);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试.");	 
+			}			
+			
+			public function OnResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResult);
+				
+				RecordGroup.removeAll();
+				mUserInfo.dataProvider = RecordGroup;
+				
+				var str:String = e.result.toString();
+				var strArray:Array = str.split("#");
+				
+				for( var i:int = 0;i<strArray.length; i++ )  
+				{
+					var strRecord:String = strArray[i];
+					var strRecordArray:Array = strRecord.split("~");
+					
+					if( strRecordArray[0] == "1" )
+						continue;
+					
+					//	if( strRecordArray[5] == "1" )	// 系统账号
+					//		continue;
+					
+					if( strRecordArray[5] == "2" )	// 已逻辑删除账号
+						continue;
+				
+					var strAccountType:String = "";
+					
+					if("0" == strRecordArray[11])
+						strAccountType = "企业用户";
+					else if("1" == strRecordArray[11])
+						strAccountType = "设计师";
+					else if("2" == strRecordArray[11])
+						strAccountType = "普通用户";
+					else if("11" == strRecordArray[11])
+						strAccountType = "超级管理员";
+						
+					RecordGroup.addItem({dataName:strRecordArray[0], 
+										 dataQQ:strRecordArray[1], 
+										 dataTel:strRecordArray[2],
+										 dataTime1:strRecordArray[3],
+										 dataAdministrator:strRecordArray[9],
+										 dataUserID:strRecordArray[4],
+										 dataTimeCout:GetVisTime(strRecordArray[3])+"天",
+										 dataFolder:strRecordArray[6],
+										 dataLastTime:strRecordArray[8],
+										 companyID:strRecordArray[10],
+										 accounttype:strAccountType
+					                     });
+				}
+				
+				//更新界面
+				mUserInfo.dataProvider = RecordGroup;
+			}
+			
+			/***
+			 * 计算有效时间
+			 * 
+			 */
+			public function GetVisTime(_time:String):Number
+			{
+				var StarTim:Number;
+				var nowTim:Date = new Date();
+				if (_time is String)
+				{
+					var tempArr1:Array = _time.split("-");
+					var Year:Number = Number(tempArr1[0]);
+					var Moon:Number = Number(tempArr1[1]) - 1;
+					var Day:Number = Number(tempArr1[2]);
+					StarTim = Number(new Date(Year,Moon,Day,0,0,0));
+				}
+				
+				var StartTime:Number	= StarTim / 1000;
+				var EndTime:Number 	 	= Math.floor((Number(nowTim)/1000));
+				var JobTime:Number 		= StartTime - EndTime;
+				var JobDay:Number 		= Math.floor(JobTime / 86400);
+				return JobDay;
+			}				
+			
+			/***
+			 * 添加记录
+			 * 
+			 */
+			public function OnAddRecord():void
+			{
+				mRecordDialog.SetComboIndex(m_strCurrentCompanyID);
+				mRecordDialog.OnAddShow();
+			}
+			
+			public function OnModifyRecord():void
+			{
+				if (mUserInfo.selectedIndex == -1) 
+					return;	
+				
+				if("超级管理员" == mUserInfo.selectedItem.accounttype)
+				{
+					m_iHouse.mAlertDialog.show("禁止修改超级管理员");
+					return;
+				}
+					
+				mRecordDialog.SetUserInfo(mUserInfo.selectedItem);
+			}
+			
+			//修改用户后界面更新
+			public function ItemUpdate(objUserInfo:Object):void
+			{
+				//objUserInfo = {dataName:mUserName,companyID:strNewCompanyID,dataQQ:mQQ.text,
+				//	             dataTel:mTel.text,dataTime1:mTimeEnd.text,accounttype:mAccountTypeObj.accountType};
+
+				for (var iIndex:int = 0; iIndex < RecordGroup.length; ++iIndex)
+				{
+					var itemRecord:Object = RecordGroup[iIndex];
+					if(itemRecord.dataName == objUserInfo.dataName)
+					{
+						//此帐号转移到其它公司下
+						if(m_strCurrentCompanyID != objUserInfo.companyID)
+						{
+							RecordGroup.removeItemAt(iIndex);
+						}
+						else
+						{
+							itemRecord.dataName    		 = objUserInfo.dataName;
+							itemRecord.dataQQ      		 = objUserInfo.dataQQ;
+							itemRecord.dataTel     		 = objUserInfo.dataTel;
+							itemRecord.dataTime1   		 = objUserInfo.dataTime1;
+							itemRecord.accounttype       = objUserInfo.accounttype;
+							itemRecord.dataAdministrator = objUserInfo.dataAdministrator;
+						}
+						
+						mUserInfo.dataProvider.itemUpdated(mUserInfo.selectedItem);
+						
+						break;
+					}
+				}
+			}
+			
+			public function OnDeleteRecord():void
+			{
+				if (mUserInfo.selectedIndex == -1) 
+					return;	
+				
+				m_iHouse.mYesNoDialog.mYes.label = "是";  
+				m_iHouse.mYesNoDialog.mNo.label  = "否";
+				m_iHouse.mYesNoDialog.show("是否删除",OnNewFile_Yes,OnNewFile_No);					
+			}
+			
+			public function OnNewFile_No():void
+			{			
+			}   
+			
+			public function OnNewFile_Yes():void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("DeleteUser");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnDelError);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnDelResult);
+				
+				var strID:String = mUserInfo.selectedItem.dataUserID;
+				var strUserName:String = mUserInfo.selectedItem.dataName;
+				var strFolder:String   = mUserInfo.selectedItem.dataFolder;
+				op.send(strID,strUserName,strFolder); 				
+			}
+			
+			
+			private function OnDelError(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnDelError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnDelResult);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试.");	 
+			}			
+			
+			public function OnDelResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnDelError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnDelResult);
+				mUserInfo.dataProvider.removeItemAt(mUserInfo.selectedIndex); 
+				
+				var jsonStr:String = e.result.toString();
+				var jsonObj:Object = com.adobe.serialization.json.JSON.decode(jsonStr); 
+				
+				if("0" == jsonObj.success)
+				{
+					m_iHouse.mHelpDialog.show(jsonObj.nofityMsg);
+				}
+			}	
+
+			/***
+			 * 登录记录
+			 * 
+			 */
+			public function showLoginInfoDialog ():void
+			{
+				m_iHouse.mLoginInfoDialog.Show();
+			}
+			
+			/***
+			 * 得到公司列表
+			 * 
+			 */
+			public function GetCompanyList():void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("GetCompanyList");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnOnCompanyListError);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnCompanyListResult);
+				op.send(m_iHouse.mStrAccountType,m_iHouse.mStrCompanyID); 
+			}
+			
+			private function OnOnCompanyListError(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnOnCompanyListError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnCompanyListResult);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试.");	 
+			}			
+			
+			public function OnCompanyListResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnOnCompanyListError);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnCompanyListResult);
+				
+				var strResult:String = e.result.toString();
+				
+				//获取到的数据异常
+				if("0" == strResult)
+					return;
+				
+				var strArray:Array = strResult.split("#");
+				
+				//初始显示公司帐号
+				var strDefaultCompanyID:String = "";
+				//从1开始，因为第一个数据为0
+				for( var index:int = 1;index<strArray.length; ++index)  
+				{
+					var strRecord:String = strArray[index];
+					var strRecordArray:Array = strRecord.split("~");
+					
+					CompanyGroup.addItem({CompanyID:strRecordArray[0],  //公司ID
+										  CompanyName:strRecordArray[1], //公司名称
+										  Folder:strRecordArray[2] //公司名称
+					});
+					
+					mRecordDialog.InsertCompanyInfo(strRecordArray[0],strRecordArray[1],strRecordArray[2]);
+					
+					if("" == strDefaultCompanyID)
+						strDefaultCompanyID = strRecordArray[0];
+				}
+				
+				//mRecordDialog.mCompanyGroup = CompanyGroup;
+				//mRecordDialog.SetCompanyInfo(strArray);
+				
+				if("" != strDefaultCompanyID)
+				{
+					GetGetComanyUserList(strDefaultCompanyID)
+					m_strCurrentCompanyID = strDefaultCompanyID;
+				}
+			}
+			
+			public function OnTreeChange(event:ListEvent):void			
+			{
+				if (mCompanyTree.selectedItem.hasOwnProperty("CompanyID")) 
+				{ 
+					RecordGroup.removeAll();
+					m_strCurrentCompanyID = mCompanyTree.selectedItem.CompanyID;
+					GetGetComanyUserList(m_strCurrentCompanyID) 
+				} 
+			}
+			
+			//使用新的查询公司下有那些帐号
+			public function GetGetComanyUserList(strComanyID:String):void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("GetUserList");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnError);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnResult);
+				op.send(strComanyID); 
+			}
+			
+			//树右击事件
+			private function treeRightClick(e:MouseEvent):void
+			{
+				//非管理员禁止操作
+				if(m_iHouse.mStrAccountType != "11")
+					return;
+				
+				var menuItems:Array = new Array();
+				var menuAdd:Object= new Object;  
+				menuAdd.label = "新增";
+				menuItems.push(menuAdd);			
+				
+				if(mCompanyTree.selectedItem )
+				{
+					var menuModify:Object= new Object;  
+					menuModify.label = "修改";
+					menuItems.push(menuModify);
+					
+					var menuDel:Object=new Object();
+					menuDel.label="删除";
+					menuItems.push(menuDel);
+				}
+				
+				menuTree.dataProvider = menuItems;
+				
+				var point:Point = new Point(mouseX,mouseY);  
+				point = localToGlobal(point);   
+				menuTree.show(point.x,point.y);  //显示右键菜单
+			}
+			
+			private function treeClick(e:MouseEvent):void
+			{
+				if(menuTree!=null)
+					menuTree.hide();
+			}
+			
+			//点击菜单，相应方法 
+			private function tree_MenuItemSelected(event:MenuEvent):void	
+			{
+				//非管理员禁止操作
+				if(m_iHouse.mStrAdministrator != "1")
+					return;
+				
+				var selIndex:int = mCompanyTree.selectedIndex;
+				var strCompanyID:String = "";
+				
+				if( -1 != selIndex)
+					strCompanyID = CompanyGroup.source[selIndex].CompanyID;
+				
+				var menuItem:Object = event.menu.selectedItem as Object;
+				switch(menuItem.label)
+				{
+					case "新增":
+					{
+						m_iHouse.mCompanyDialog.OnShowDialog("0","");
+					}
+						break;
+					
+					case "修改":
+					{			
+						m_iHouse.mCompanyDialog.OnShowDialog("1",strCompanyID);
+					}
+						break;
+					
+					case "删除":
+					{
+						m_iHouse.mCompanyDialog.OnDelete(strCompanyID);		
+					}
+						break;
+				}
+			}
+			
+			//删除公司后界面同步显示
+			public function RemoveCompanyInfo(strCompanyID:String):void
+			{
+				var index:int = 0;
+				for each(var item:Object in CompanyGroup)
+				{
+					if(item.CompanyID == strCompanyID)
+					{
+						CompanyGroup.removeItemAt(index);
+					}
+					
+					++index;
+				}
+			}
+			
+			//增加公司后界面同步显示
+			public function InsertCompanyInfo(strCompanyID:String,strCompanyName:String,strFolder:String):void
+			{
+				CompanyGroup.addItem({CompanyID:strCompanyID,  //公司ID
+									  CompanyName:strCompanyName,//公司名称
+									  companyFolder:strFolder    //存放数据目录
+				});
+			}
+			
+			//公司信息修改后，同步界面
+			public function ModifyCompanyInfo(strCompanyID:String,strCompanyName:String):void
+			{
+				var index:int = 0;
+				for each(var item:Object in CompanyGroup)
+				{
+					if(item.CompanyID == strCompanyID)
+					{
+						CompanyGroup[index].CompanyName = strCompanyName;
+						
+						//刷新界面
+						mCompanyTree.dataProvider = CompanyGroup;
+					}
+					
+					++index;
+				}
+			}
+			
+			//根据公司ID取得公司名称
+			public function GetCompanyInfo(strCompanyID:String):Object
+			{
+				for each(var companyInfo:Object in CompanyGroup)
+				{
+					if(companyInfo.CompanyID == strCompanyID)
+					{
+						return companyInfo;
+					}
+				}
+				
+				return null;
+			}
+			
+			public function SetButtonState():void
+			{
+				//管理员或企业用户
+				var bShow:Boolean = ("11" == m_iHouse.mStrAccountType || "0" == m_iHouse.mStrAccountType) ? true: false;
+				
+				ShowInfo.visible    = ("1" == m_iHouse.mStrAdministrator && bShow)  ? true : false;
+				AddUser.visible     = ("1" == m_iHouse.mStrAdministrator && bShow)  ? true : false;
+				ModifyUser.visible  = ("1" == m_iHouse.mStrAdministrator && bShow)  ? true : false;
+				DeleteUser.visible  = ("1" == m_iHouse.mStrAdministrator && bShow)  ? true : false;
+				mLine.visible       = ("1" == m_iHouse.mStrAdministrator && bShow)  ? true : false;
+				mBottomRect.visible = ("1" == m_iHouse.mStrAdministrator && bShow)  ? true : false;
+
+				mCompanyTree.bottom = ("1" == m_iHouse.mStrAdministrator && bShow) ? 60 : 1;
+				mUserInfo.bottom    = ("1" == m_iHouse.mStrAdministrator && bShow) ? 60 : 1;
+			}
+			
+			//双击时编辑用户
+			protected function OnDoubleClick(event:MouseEvent):void
+			{
+				OnModifyRecord();
+			}
+			
+		]]>
+	</fx:Script>	
+
+	<s:DataGrid id="mUserInfo" visible="true" left="143" right="1" top="0" bottom="56"
+				dataProvider="{RecordGroup}" doubleClick="OnDoubleClick(event)" doubleClickEnabled="true" fontFamily="宋体"
+				fontSize="15" requestedRowCount="5" textAlign="center">
+		<s:columns>
+			<s:ArrayList>
+				<s:GridColumn dataField="dataName"          width="{(this.width-150)/8}"  headerText="用户名" headerRenderer="Skins.SparkDGHeadCenterRender"></s:GridColumn>
+				<s:GridColumn dataField="accounttype"       width="{(this.width-150)/8}"   headerText="帐号类型" headerRenderer="Skins.SparkDGHeadCenterRender"></s:GridColumn>
+				<s:GridColumn dataField="dataTime1"   	    width="{(this.width-150)/8}"  headerText="有效期时间截止" headerRenderer="Skins.SparkDGHeadCenterRender"></s:GridColumn>
+				<s:GridColumn dataField="dataTimeCout"      width="{(this.width-150)/8}"  headerText="剩余天数" headerRenderer="Skins.SparkDGHeadCenterRender"></s:GridColumn>
+				<!--<s:GridColumn dataField="" 	            width="{(this.width-150)/8}"  headerText="描述信息" headerRenderer="Skins.SparkDGHeadCenterRender"></s:GridColumn>-->
+				<s:GridColumn dataField="dataTel" 	        width="{(this.width-150)/8}"  headerText="电话" headerRenderer="Skins.SparkDGHeadCenterRender"></s:GridColumn>
+				<s:GridColumn dataField="dataAdministrator" width="0"    visible="false"   headerText="管理员权限" resizable="false" headerRenderer="Skins.SparkDGHeadCenterRender"></s:GridColumn>
+				<s:GridColumn dataField="dataLastTime"      width="{(this.width-150)/8}"   headerText="最近登录时间" headerRenderer="Skins.SparkDGHeadCenterRender"></s:GridColumn>
+				<s:GridColumn dataField="dataDesc"   	    width="{(this.width-150)/8}"   headerText="最近登录IP" headerRenderer="Skins.SparkDGHeadCenterRender"></s:GridColumn>
+				<s:GridColumn dataField="dataQQ" 	        width="{(this.width-150)/8}"  headerText="QQ" headerRenderer="Skins.SparkDGHeadCenterRender"></s:GridColumn>
+				
+			</s:ArrayList>
+		</s:columns>
+	</s:DataGrid>	
+	
+	
+	<s:Rect id="mLine" left="1" bottom="54" right="1" height="2">
+		<s:fill>   
+			<s:SolidColor color="#000000"/>
+		</s:fill>
+	</s:Rect>	
+	
+	<s:Rect id="mBottomRect" left="1" bottom="0" right="1" height="54" >
+		<s:fill>
+			<s:SolidColor color="#191B21"/>
+		</s:fill>
+	</s:Rect>	
+	
+
+	<s:Button id="ShowInfo" right="439" bottom="10" width="120" label="登录信息" buttonMode="true"
+			  click="showLoginInfoDialog();" fontFamily="宋体" skinClass="Skins.NormalCreateBtnSkin"/>
+	
+	<s:Button id="AddUser" right="300" bottom="10" width="120" label="添加用户" buttonMode="true"
+			  click="OnAddRecord();" fontFamily="宋体" skinClass="Skins.NormalCreateBtnSkin"/>
+	
+	<s:Button id="ModifyUser" right="160" bottom="10" width="120" label="修改用户" buttonMode="true"
+			  click="OnModifyRecord();" fontFamily="宋体" skinClass="Skins.NormalCreateBtnSkin"/>	
+	
+	<s:Button id="DeleteUser" right="20" bottom="10" width="120" label="删除用户" buttonMode="true"
+			  click="OnDeleteRecord();" fontFamily="宋体" skinClass="Skins.NormalCreateBtnSkin"/>		
+	<mx:Tree id="mCompanyTree" left="1" width="139" top="0" bottom="60" dataProvider="{CompanyGroup}" labelField="CompanyName" change="OnTreeChange(event);" visible="true"/>
+	<local:RecordDialog id="mRecordDialog" x="{(this.width-mRecordDialog.width)/2}" y="{(this.height-mRecordDialog.height)/2}" visible="false"  />
+
+</s:Group>

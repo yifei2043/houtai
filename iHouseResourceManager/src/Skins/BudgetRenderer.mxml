@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009"
+				xmlns:s="library://ns.adobe.com/flex/spark"
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				width="670" height="70" creationComplete="OnInit();" render="OnRender();">
+	<fx:Script>
+		<![CDATA[
+			
+			public function OnInit():void
+			{		
+				data.progress = mProgress;
+				mProgress.setProgress(0,100);
+				mProgress.visible = false;
+				data.deletbtn = mDelete;
+			}
+			
+			public function OnRender():void
+			{		
+				data.progress = mProgress;
+				data.deletbtn = mDelete;
+			}		
+			
+			public function OnDelete():void
+			{
+				if( data.pwnd )
+					data.pwnd.OnDeleteFile(data.pathname);
+			}
+			
+			public function OnCheck():void
+			{
+/* 				if( data.pwnd )
+					data.pwnd.OnSetThumbnail( data.name,mCheckBox.selected);
+				
+				data.bCheck = mCheckBox.selected; */
+			}
+			
+			
+		]]>		
+	</fx:Script>			
+	<s:layout>
+		<s:BasicLayout/>
+	</s:layout>	
+	<s:Rect left="0" right="0" bottom="1" height="0.5" >
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>		
+	<s:Image id="image1" x="6" y="5" width="65" height="60" scaleMode="stretch"
+			 source="{data.image}"/>
+	<s:Label id="mText1" x="84" y="25" text="{data.name}" width="270" fontFamily="宋体" fontSize="14"/>
+	<s:Label id="mText2" x="447" y="26" text="{data.size}" width="100" fontFamily="宋体" fontSize="14"/>
+	<s:Label id="mText3" x="357" y="25" text="{data.imageSize}" width="70" fontFamily="宋体" fontSize="14"/>
+	<mx:ProgressBar id="mProgress" maximum="100" minimum="0" mode="manual"   x="84" y="50" width="458" labelPlacement="right" label="%3%%"/>
+	<s:CheckBox x="17" y="22" id="mCheckBox" selected="{data.bCheck}" change="OnCheck();" visible="false"/>
+	<s:Button id="mDelete" x="567" y="22" width="48" label="删除" fontFamily="宋体" enabled="{data.bUpload}" click="OnDelete()" skinClass="Skins.CommonButton"/>
+
+</s:ItemRenderer>
+
+
+

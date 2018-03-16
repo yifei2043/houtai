@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="100%" height="100%" fontFamily="宋体"
+		 fontSize="26" fontStyle="italic" fontWeight="bold">
+	
+	<fx:Script>
+		<![CDATA[	
+			import mx.core.UIComponent;
+			import mx.rpc.AbstractOperation;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			import spark.filters.ColorMatrixFilter;
+			import spark.filters.ConvolutionFilter;
+			
+			import utils.JPGEncoder1;
+			import utils.gif.player.GIFPlayer;
+	
+			public var m_iHouse3DView:iHouse3DView;
+			public var m_Player:GIFPlayer = new GIFPlayer();
+			public var m_UI:UIComponent   = new UIComponent;			
+			
+			public function init() : void
+			{
+				var request:URLRequest = new URLRequest(m_iHouse3DView.m_DataProcess.webserviceAddr+"loading.gif"); 
+				m_Player.load(request);                          				
+				//罩层进度条
+				m_UI.addChild(m_Player);
+				addElement(m_UI);  					
+			}
+			
+			public  function OnClose():void
+			{
+				m_iHouse3DView.m_DataProcess.StopRender();
+				this.visible = false;
+			}	
+			
+			public function HideLoading():void
+			{
+				mBak.visible = false;
+			}
+					
+			public function ShowDialog( iWidth:int=720, iHeight:int=480, bBtn:Boolean = false ):void
+			{		
+				this.x = (m_iHouse3DView.width - (iWidth+255) )/2;
+				this.y = (m_iHouse3DView.height- (iHeight+60) )/2;					
+				this.width = iWidth+255;
+				this.height= iHeight+60;
+				mBak.visible = false;
+				this.visible = true;
+	
+												
+				m_UI.x =this.width/2-200;
+				m_UI.y =this.height/2-60;
+				m_ProgressTime1.x = m_UI.x+30;
+				m_ProgressTime1.y = m_UI.y+70;
+				m_UI.visible	 = !bBtn;
+				m_Player.visible = !bBtn;
+				mBak.visible 	 = !bBtn;
+				
+				m_ProgressTime1.text="";				
+			}	
+			
+			public function OnRuiHua():void
+			{
+				var matrix:Array = new Array();
+				
+				matrix = matrix.concat([0, -1, 0]);
+				
+				matrix = matrix.concat([-1, 5, -1]);
+				
+				matrix = matrix.concat([0, -1, 0]);
+
+				var convolution:ConvolutionFilter = new spark.filters.ConvolutionFilter();
+				
+				convolution.matrixX = 3;
+				
+				convolution.matrixY = 3;
+				
+				convolution.matrix = matrix;
+				
+				convolution.divisor = 1;
+				
+				var filtersArray:Array = new Array(convolution);
+				
+				mImage.filters = filtersArray;
+			}
+			
+			public function OnHeiBai():void
+			{
+				var matrix:Array = new Array();
+				
+				matrix = matrix.concat([0.3086, 0.6094, 0.082, 0, 0]); // red
+				
+				matrix = matrix.concat([0.3086, 0.6094, 0.082, 0, 0]); // green
+				
+				matrix = matrix.concat([0.3086, 0.6094, 0.082, 0, 0]); // blue
+				
+				matrix = matrix.concat([0, 0, 0, 1, 0]); // alpha
+								
+				var gray:ColorMatrixFilter = new spark.filters.ColorMatrixFilter(matrix);
+				
+				var filtersArray:Array = new Array(gray);
+				
+				mImage.filters = filtersArray;				
+			}
+			
+			public function OnUndo():void
+			{
+				mImage.filters = null;
+			}
+			
+			/***
+			 * 更新缩略图
+			 */
+			public function OnUpdateIcon():void
+			{
+				var op:AbstractOperation = m_iHouse3DView.m_DataProcess.mWebService1.getOperation("UpdateIconData");
+				m_iHouse3DView.m_DataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnErrorIcon);
+				m_iHouse3DView.m_DataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnResultIcon);
+				var jpg:JPGEncoder1    = new JPGEncoder1(80);
+				var ba:ByteArray=jpg.encode(mImage.bitmapData);
+				op.send(ba,m_iHouse3DView.m_space3d.m_strPathThumbnail);				
+			}
+			
+			private function OnErrorIcon(e:FaultEvent):void
+			{
+				m_iHouse3DView.m_DataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnErrorIcon);
+				m_iHouse3DView.m_DataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResultIcon);
+				m_iHouse3DView.mAlert3DViewDialog.show("缩略图更新失败.");	 
+			}			
+			
+			public function OnResultIcon(e:ResultEvent):void
+			{
+				m_iHouse3DView.m_DataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnErrorIcon);
+				m_iHouse3DView.m_DataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResultIcon);
+				m_iHouse3DView.mAlert3DViewDialog.show("缩略图更新成功.");
+			}		
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<mx:Blur id="blurOn" blurXFrom="0.0" blurXTo="10.0" blurYFrom="0.0" blurYTo="10.0"/>
+		<mx:Blur id="blurOut" blurXFrom="10.0" blurXTo="0.0" blurYFrom="10.0" blurYTo="0.0"/>
+	</fx:Declarations>	
+	<s:Rect x="-1000" y="-1000" width="5000" height="5000" alpha="0.5">
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>		
+	<s:Group left="0" right="0" top="0" bottom="0" mouseDown="this.startDrag();" mouseUp="this.stopDrag()">
+		<s:Rect right="20" top="20" left="10" bottom="8" radiusX="5">
+			<s:fill>
+				<s:SolidColor color="#ffffff"/>
+			</s:fill>		
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="8" blurY="8" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 		
+		</s:Rect>	
+		<s:Rect right="0" top="0" width="35" height="35" radiusX="45">
+			<s:stroke>
+				<s:SolidColorStroke color="#ffffff" caps="none" weight="3" joints="miter" miterLimit="4"/>
+			</s:stroke>	
+			<s:fill>
+				<s:SolidColor color="#000000"/>
+			</s:fill>
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="4" blurY="4" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 	
+		</s:Rect>
+				
+		
+		<s:Image left="25" top="35"  right="230" bottom="25" id="mImage" smooth="true" scaleMode="stretch">	
+		</s:Image>
+		<s:Rect id="mBak" right="230" top="35" left="25" bottom="25" >	
+			<s:fill>
+				<s:SolidColor color="#eeeeee"/>
+			</s:fill> 	
+		</s:Rect>
+		
+		<s:Label id="m_ProgressTime" right="50" top="125" width="150" color="#000000" fontFamily="宋体"
+				 fontSize="14" fontStyle="normal" fontWeight="normal" mouseEnabled="false"
+				 text="未连接服务器" textAlign="center">
+		</s:Label>
+		
+		<s:Label id="m_ProgressTime1" x="279" y="248" width="100"  fontFamily="宋体" 
+				 fontSize="26" text="" textAlign="center" verticalAlign="middle"/>
+		
+		<s:Image right="8" top="10"  source="@Embed('/assets/close.png')" 
+				 mouseDownEffect="{blurOn}" mouseUpEffect="{blurOut}"
+				 buttonMode="true" click="OnClose();" />
+		
+		<s:Label id="mTitle1" right="40" y="50" fontFamily="宋体" fontSize="26" text="Cloud rendering" visible="true"/>
+  				
+		<s:Button id="mEffect1" right="50" bottom="90" width="150" height="23" label="图像锐化" click="OnRuiHua();"
+				  fontFamily="宋体" fontSize="16" fontStyle="normal" fontWeight="normal"
+				  skinClass="Skins.CommonButton"/>
+		
+		<s:Button id="mEffect2" right="50" bottom="60" width="150" height="23" label="图像黑白" click="OnHeiBai();"
+				  fontFamily="宋体" fontSize="16" fontStyle="normal" fontWeight="normal"
+				  skinClass="Skins.CommonButton"/>
+		
+		<s:Button id="mEffect3" right="50" bottom="30" width="150" height="23" label="恢复图像" click="OnUndo();"
+				  fontFamily="宋体" fontSize="16" fontStyle="normal" fontWeight="normal"
+				  skinClass="Skins.CommonButton"/>
+		<s:Button id="mEffect0" right="50" bottom="150" width="150" height="23" label="更新缩略图" click="OnUpdateIcon();"
+				  fontFamily="宋体" fontSize="16" fontStyle="normal" fontWeight="normal"
+				  skinClass="Skins.CommonButton"/>
+		
+	</s:Group>		
+</s:Group>
+

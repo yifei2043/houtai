@@ -1,0 +1,485 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 width="850" height="600" alpha="1">
+			 
+	<fx:Script>
+		<![CDATA[
+			import flash.display3D.IndexBuffer3D;
+			
+			import flashx.textLayout.elements.BreakElement;
+			import flashx.textLayout.formats.Direction;
+			
+			import mx.collections.ArrayCollection;
+			import mx.utils.ObjectUtil;
+			
+			public var m_iHousePanoramic:iHousePanoramic;
+			
+			//保存缩编图+xml
+			public var mImageProvider:ArrayCollection = new ArrayCollection();
+			
+			//图钉组控件
+			public var mGroupDictory:Dictionary = new Dictionary();
+			
+			//关联全景按钮
+			public var mBtnDictory:Dictionary = new Dictionary();
+			
+			//图钉图片控件
+			public var mPicDictory:Dictionary = new Dictionary();
+			
+			//为了赋值拷贝所以这样做
+			public var xmlArray:Array = new Array();
+            
+			//当前选择List的索引
+			public var mCurrentListIndex:uint = 0;
+			
+			//当前选择点击的关联全景按钮
+			public var mCurrentButtonIndex:uint = 0;
+			
+			//当前选择List 关联的xml
+			public var mCurrentListXML:XML;
+			
+			//设置控件对应值以及xml初始值
+			public function OnInit():void
+			{
+				mGroupDictory[1] = mGroup1;
+				mGroupDictory[2] = mGroup2;
+				mGroupDictory[3] = mGroup3;
+				mGroupDictory[4] = mGroup4;
+				mGroupDictory[5] = mGroup5;
+				mGroupDictory[6] = mGroup6;
+				
+				mPicDictory[1] = m_R1;
+				mPicDictory[2] = m_R2;
+				mPicDictory[3] = m_R3;
+				mPicDictory[4] = m_R4;
+				mPicDictory[5] = m_R5;
+				mPicDictory[6] = m_R6;
+				
+				mBtnDictory[1] = mButton1;
+				mBtnDictory[2] = mButton2;
+				mBtnDictory[3] = mButton3;
+				mBtnDictory[4] = mButton4;
+				mBtnDictory[5] = mButton5;
+				mBtnDictory[6] = mButton6;
+					
+				var xmlData:XML =  <root>
+									  <item name="item1" xPos= "565" yPos="6" ath="0" atv="0" srcPic="" dstPic="" dstPicIndex=""/>
+									  <item name="item2" xPos= "565" yPos="52"  ath="0" atv="0" srcPic="" dstPic="" dstPicIndex=""/>
+									  <item name="item3" xPos= "565" yPos="99"  ath="0" atv="0" srcPic="" dstPic="" dstPicIndex=""/>
+									  <item name="item4" xPos= "565" yPos="147" ath="0" atv="0" srcPic="" dstPic="" dstPicIndex=""/>
+									  <item name="item5" xPos= "565" yPos="192" ath="0" atv="0" srcPic="" dstPic="" dstPicIndex=""/>
+									  <item name="item6" xPos= "565" yPos="240" ath="0" atv="0" srcPic="" dstPic="" dstPicIndex=""/>
+								   </root>;				
+				
+				for(var index:uint = 0; index < 6; ++index)
+					xmlArray[index] = ObjectUtil.copy(xmlData);
+			}
+			
+			//加载图片到 List列表
+			public function LoadImages():void
+			{
+				OnInit();
+				
+				var imgCount:uint = m_iHousePanoramic.arrayImages.length;
+				
+				for(var index:uint = 0; index < imgCount; ++index)
+				{
+					mImageProvider.addItem({thumbnailImage:m_iHousePanoramic.arrayImages[index],parent:this,xmlData:xmlArray[index]});
+				}
+			}
+			
+			//点击图钉上按钮关联全景
+			protected function OnShowPanoramic(event:MouseEvent,index:uint):void
+			{
+				mCurrentButtonIndex = index;
+				
+				m_iHousePanoramic.mRelevanceImage.LoadImages();
+				
+			    var optIndex:String = mCurrentListXML.item[index - 1].@dstPicIndex;
+				m_iHousePanoramic.mRelevanceImage.SetOptionIndex(optIndex);
+				m_iHousePanoramic.mRelevanceImage.visible = true;
+			}
+
+			//更新xml设置热点进入全景图
+			public function OnRelevanceImage(img:String,optIndex:String):void
+			{
+				var itemIndex:String = "item" + mCurrentButtonIndex.toString();
+				var index:uint = 1;
+				for each(var tItem:XML in mCurrentListXML.item)
+				{
+					if(tItem.@name == itemIndex)
+					{
+						tItem.@dstPic = img
+						tItem.@dstPicIndex=optIndex;
+						break;
+					}
+					
+					++index;
+				}
+			}
+			
+			//取得对应xml item
+			public function GetItemInfo(itemName:String):Object
+			{
+				var Index:uint = 0;
+				var objItem:Object = null;
+				
+				for each(var tItem:XML in mCurrentListXML.item)
+				{
+					++Index;
+					
+					if(tItem.@name == itemName)
+					{
+						objItem = { index:Index,xmlData:tItem};
+						break;
+					}
+				}
+				
+				return objItem;
+			}
+			
+			//保存热点信息
+			public function SaveHostport(obj:Object,nPicWidth:Number,nPicHeight:Number):void
+			{
+				//图钉图片坐标
+				var xPicPos:Number = mPicDictory[obj.index].mouseX;
+				var yPicPos:Number = mPicDictory[obj.index].mouseY;
+				
+				//取得图钉左下角点
+				var xPos:Number = mPanoramicPic.mouseX - xPicPos +5;
+				var yPos:Number = mPanoramicPic.mouseY + (30-yPicPos);  //30图片高
+				
+				if(xPos < 0)
+					xPos = 0;
+				
+				if(yPos < 0)
+					yPos = 0;
+				
+				//转换成鼠标在原全景图中坐标
+				xPos = xPos * (nPicWidth/mPanoramicPic.width);
+				yPos = yPos * (nPicHeight/mPanoramicPic.height);
+				
+				//trace("xPos="+xPos.toString() + " yPos=" + yPos.toString());
+				
+				var ath:Number = (xPos/nPicWidth-0.5)* 360*0.75;
+				var atv:Number = (yPos/nPicWidth-0.5)*180*4/3.0;
+				
+				//xml中保存热点坐标
+				obj.xmlData.@ath= ath.toString();
+				obj.xmlData.@atv= atv.toString();
+				
+				//trace("ath=" + ath.toString()+"atv="+ atv.toString());
+			}
+			
+			//保存球形热点信息
+			public function SaveSphericalHostport(objS:Object,nPicWidth:Number,nPicHeight:Number):void
+			{
+				//图钉图片坐标
+				var xPicPos:Number = mPicDictory[objS.index].mouseX;
+				var yPicPos:Number = mPicDictory[objS.index].mouseY;
+				
+				//取得图钉左下角点
+				var xPos:Number = mPanoramicPic.mouseX - xPicPos +5;
+				var yPos:Number = mPanoramicPic.mouseY + (30-yPicPos);  //30图片高
+				
+				if(xPos < 0)
+					xPos = 0;
+				
+				if(yPos < 0)
+					yPos = 0;
+
+				xPos = xPos * (nPicWidth/mPanoramicPic.width);
+				yPos = yPos * (nPicHeight/mPanoramicPic.height);
+				
+				//trace("xPos="+xPos.toString() + " yPos=" + yPos.toString());
+				
+				var ath:Number = (xPos/nPicWidth-0.5)* 360;
+				var atv:Number = (yPos/nPicHeight-0.5)*(360*nPicWidth/nPicHeight); 
+				
+				//xml中保存热点坐标
+				objS.xmlData.@ath= ath.toString();
+				objS.xmlData.@atv= atv.toString();
+				
+				//trace("ath=" + ath.toString()+"atv="+ atv.toString());
+			}
+			
+			//保存图钉容器窗口坐标
+			public function SavePushpinPosition(obj:Object):void
+			{
+				var xGroupPos:Number = mGroupDictory[obj.index].mouseX;
+				var yGroupPos:Number = mGroupDictory[obj.index].mouseY;
+				
+				//取得窗口右上角坐标
+				var xPos:Number = mPanoramicPic.mouseX - xGroupPos +5;
+				var yPos:Number = mPanoramicPic.mouseY - yGroupPos +5; 
+				
+				if(xPos < 0)
+					xPos = 0;
+				
+				if(yPos < 0)
+					yPos = 0;
+				
+				obj.xmlData.@xPos = xPos;
+				obj.xmlData.@yPos = yPos;
+			}
+			
+			//移动图钉放开鼠标后，保存热点以及图钉窗口坐标
+			protected function OnMouseUp(event:MouseEvent,index:uint):void
+			{
+				var itemIndex:String = "item" + index.toString();
+				
+				var objItem:Object = GetItemInfo(itemIndex);
+				if(null == objItem)
+				{
+					trace("GetItemIndex failed");
+					return;
+				}
+				
+				var nPicWidth:Number = mPanoramicPic.bitmapData.width;
+				var nPicHeight:Number = mPanoramicPic.bitmapData.height;
+				
+				//十字形图形比例为3:4   球形比较为2:1
+				var nPicType:Number = nPicWidth/nPicHeight;
+				
+				//保存热点坐标
+				if(1 > nPicType)
+				{
+					SaveHostport(objItem,nPicWidth,nPicHeight);
+				}
+				else
+				{
+					SaveSphericalHostport(objItem,nPicWidth,nPicHeight);
+				}
+				
+				//保存图钉窗口坐标
+				SavePushpinPosition(objItem);
+			}
+		
+			//生成全景xml
+			public function BuildPanoramicData():String
+			{
+				var providerLen:uint = mImageProvider.length;
+				if(0 == providerLen)
+					return "";
+				
+				var strXMLData:String = "<root>";
+				
+				for(var index:uint = 0; index < providerLen; ++index)
+				{
+					var xmlListData:XML = mImageProvider[index].xmlData;
+					
+					var strPanoramicNode:String = "<Panoramic>";
+					strPanoramicNode += "<src>" + mImageProvider[index].thumbnailImage + "</src>";
+					for each(var tItem:XML in xmlListData.item)
+					{
+						if(tItem.@dstPic != "")
+						{
+							strPanoramicNode += "<Item>";
+							strPanoramicNode += "<ath>" + tItem.@ath + "</ath>";
+							strPanoramicNode += "<atv>" + tItem.@atv + "</atv>";
+							strPanoramicNode += "<dst>" + tItem.@dstPic + "</dst>";
+							strPanoramicNode += "</Item>";
+						}
+					}
+					
+					strPanoramicNode += "</Panoramic>";
+					
+					strXMLData += strPanoramicNode;	
+				}
+				
+				strXMLData += "</root>";
+
+				return strXMLData;
+			}
+			
+			//生成全景
+			protected function OnBuildPanoramic(event:MouseEvent):void
+			{
+				var panoramicData:String = BuildPanoramicData();
+				
+				//调用生成全景服务
+				m_iHousePanoramic.soapService.OnBuildPanoramic(panoramicData);
+				
+				OnClose();
+			}
+			
+			//显示大图，设置图钉图片位置
+			public function OnClickList():void
+			{
+				if(-1 == mList.selectedIndex)
+					return;
+				
+				mCurrentListIndex = mList.selectedIndex;
+				
+				var strPanoImage:String = mImageProvider[mCurrentListIndex].thumbnailImage;
+				mPanoramicPic.source = strPanoImage;
+				
+				
+				mCurrentListXML = mImageProvider[mCurrentListIndex].xmlData;
+				
+				var index:uint = 1;
+				
+				for each(var tItem:XML in mCurrentListXML.item)
+				{
+					var xPos:String = tItem.@xPos;
+					var yPos:String = tItem.@yPos;
+					
+					tItem.@srcPic = strPanoImage;
+					
+					var mGroup:Group = mGroupDictory[index];
+					mGroup.move(Number(xPos),Number(yPos));					
+					index += 1;
+				}
+			}
+			
+			protected function OnReset(event:MouseEvent):void
+			{
+				var imgCount:uint = m_iHousePanoramic.arrayImages.length;
+				var arrYPos :Array = ["6","52","99","147","192","240"];
+				
+				for(var index:uint = 0; index < imgCount; ++index)
+				{
+					//取得原xml
+					var xmlData:XML = mImageProvider[index].xmlData;
+				    var itemIndex:uint = 0;
+					for each(var tItem:XML in xmlData.item)
+					{
+						tItem.@xPos="570";
+						tItem.@yPos = arrYPos[itemIndex];
+						tItem.@ath  = "0";
+					    tItem.@atv = "0";
+						tItem.@dstPic ="";
+						tItem.@dstPicIndex = "";
+						++itemIndex;
+					}
+				}
+
+				OnClickList();
+			}
+			
+			protected function OnClose():void
+			{
+				this.visible = false;
+				this.m_iHousePanoramic.OnClose();
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<mx:Blur id="blurOn" blurXFrom="0.0" blurXTo="10.0" blurYFrom="0.0" blurYTo="10.0"/>
+		<mx:Blur id="blurOut" blurXFrom="10.0" blurXTo="0.0" blurYFrom="10.0" blurYTo="0.0"/>	
+	</fx:Declarations>
+	<s:Rect x="-1000" y="-1000" width="5000" height="5000" alpha="0.8">
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>
+	<s:Group left="0" right="0" top="0" bottom="0" >
+		<s:Rect right="15" top="15" left="15" bottom="15" radiusX="5">
+			<s:fill>
+				<s:SolidColor color="#ffffff"/>
+			</s:fill>		
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="8" blurY="8" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 		
+		</s:Rect>	
+		<s:Rect right="40"  left="25" top="70">
+			<s:stroke>
+				<s:SolidColorStroke color="#dddddd" caps="none" weight="2" joints="miter" miterLimit="1"/>
+			</s:stroke>			
+		</s:Rect>
+		<s:Rect right="0" top="0" width="35" height="35" radiusX="45">
+			<s:stroke>
+				<s:SolidColorStroke color="#ffffff" caps="none" weight="3" joints="miter" miterLimit="4"/>
+			</s:stroke>	
+			<s:fill>
+				<s:SolidColor color="#000000"/>
+			</s:fill>
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="4" blurY="4" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 	
+		</s:Rect>	
+		
+		<s:Image right="8" top="10"  source="@Embed('/assets/close.png')" 
+				 mouseDownEffect="{blurOn}" mouseUpEffect="{blurOut}"
+				 buttonMode="true" click="OnClose();" />
+		
+		<s:Label left="23"  top="30" fontFamily="宋体" fontSize="26"  text="VR全景 - 多房间热点切换"/>
+		
+		<s:BorderContainer id="mBorder1" left="20" top="110" width="180" bottom="60" >
+			<s:List id="mList" left="0" top="0" height="426" right="0" 
+					click="OnClickList()" dataProvider="{mImageProvider}"
+					itemRenderer="Skins.SceneListItemRenderer" skinClass="Skins.HouseListSkinPanoramic">
+				<s:layout>
+					<s:TileLayout horizontalGap="0" verticalGap="0" requestedColumnCount="1"/>
+				</s:layout>	
+			</s:List>	
+		</s:BorderContainer>
+		
+		<s:BorderContainer id="mBorderContainer" left="210" top="110" right="25" bottom="60" height="456">
+			<s:Image id="mPanoramicPic" left="5" top="5" bottom="5" scaleMode="stretch" right="56" />
+			
+			<s:Group id="mGroup1" right="8" top="6" width="40" height="38" mouseDown="mGroup1.startDrag();"   mouseUp="mGroup1.stopDrag();OnMouseUp(event,1)">
+				<s:Image id="m_R1" left="1" top="7" width="30" height="30" 					
+						 source="@Embed('/assets/images/tuding.png')" doubleClickEnabled="true"/>
+				<s:Button id="mButton1" visible="true" left="23"  top="20" width="16" height="16"
+						  click="OnShowPanoramic(event,1)" skinClass="Skins.EditPriceBtnSkin"
+						  toolTip="指定进入房间"/>
+			</s:Group>
+			
+			<s:Group id="mGroup2" right="8" top="52" width="40" height="38" mouseDown="mGroup2.startDrag();"  mouseUp="mGroup2.stopDrag();OnMouseUp(event,2)">
+				<s:Image id="m_R2" left="1" top="7" width="30" height="30" 					
+						 source="@Embed('/assets/images/tuding.png')" doubleClickEnabled="true"/>
+				<s:Button id="mButton2" visible="true" left="23"  top="20" width="16" height="16"
+						  click="OnShowPanoramic(event,2)" skinClass="Skins.EditPriceBtnSkin"
+						  toolTip="指定进入房间"/>
+			</s:Group>
+			<s:Group id="mGroup3" right="8" top="99" width="40" height="38" mouseDown="mGroup3.startDrag();"  mouseUp="mGroup3.stopDrag();OnMouseUp(event,3)">
+				<s:Image id="m_R3" left="1" top="7" width="30" height="30" 					
+						 source="@Embed('/assets/images/tuding.png')" doubleClickEnabled="true"/>
+				<s:Button id="mButton3"  visible="true" left="23"  top="19" width="16" height="16"
+						  click="OnShowPanoramic(event,3)" skinClass="Skins.EditPriceBtnSkin"
+						  toolTip="指定进入房间"/>
+			</s:Group>
+			<s:Group id="mGroup4" right="8" top="147" width="40" height="38" mouseDown="mGroup4.startDrag();"  mouseUp="mGroup4.stopDrag();OnMouseUp(event,4)">
+				<s:Image id="m_R4" left="1" top="7" width="30" height="30" 					
+						 source="@Embed('/assets/images/tuding.png')" doubleClickEnabled="true"/>
+				<s:Button  id="mButton4" visible="true" left="23"  top="20" width="16" height="16"
+						  click="OnShowPanoramic(event,4)" skinClass="Skins.EditPriceBtnSkin"
+						  toolTip="指定进入房间"/>
+			</s:Group>
+			<s:Group id="mGroup5" right="8" top="192" width="40" height="38" mouseDown="mGroup5.startDrag();"  mouseUp="mGroup5.stopDrag();OnMouseUp(event,5)">
+				<s:Image id="m_R5" left="1" top="7" width="30" height="30" 					
+						 source="@Embed('/assets/images/tuding.png')" doubleClickEnabled="true"/>
+				<s:Button id="mButton5"  visible="true" left="23"  top="20" width="16" height="16"
+						  click="OnShowPanoramic(event,5)" skinClass="Skins.EditPriceBtnSkin"
+						  toolTip="指定进入房间"/>
+			</s:Group>
+			<s:Group id="mGroup6" right="8" top="240" width="40" height="38" mouseDown="mGroup6.startDrag();"  mouseUp="mGroup6.stopDrag();OnMouseUp(event,6)">
+				<s:Image id="m_R6" left="1" top="6" width="30" height="30" 					
+						 source="@Embed('/assets/images/tuding.png')" doubleClickEnabled="true"/>
+				<s:Button id="mButton6"  visible="true" left="23"  top="20" width="16" height="16"
+						  click="OnShowPanoramic(event,6)" skinClass="Skins.EditPriceBtnSkin"
+						  toolTip="指定进入房间"/>
+			</s:Group>
+			
+		</s:BorderContainer>
+
+		<s:Button id="btnCancel" right="302" bottom="19" height="35" width="120" label="取消" click="OnClose();"/>
+		<s:Button right="458" bottom="19" width="120" height="35" label="生成全景"
+				  click="OnBuildPanoramic(event)"/>
+		<s:Button y="80" right="25" width="80" height="26" label="图钉复位" click="OnReset(event)"/>
+		<s:Label x="20" y="87" fontFamily="宋体" fontSize="15" text="1.选择房间"/>
+		<s:Label x="157" y="87" fontFamily="宋体" fontSize="15" text="2.移动图钉到需要设置热点的位置"/>
+		<s:Label x="449" y="87" fontFamily="宋体" fontSize="15" text="3.点击图钉右下角齿轮选择进入房间"/>
+		
+	</s:Group>
+	<s:Group  left="15" right="42" top="10" height="61" mouseDown="this.startDrag();" mouseUp="this.stopDrag()"/>
+</s:Group>

@@ -1,0 +1,991 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 xmlns:local="*"
+		 xmlns:UI="UI.*">
+	
+	<fx:Script>
+		<![CDATA[	
+			import avmplus.FLASH10_FLAGS;
+			
+			import com.adobe.protocols.dict.Database;
+			import com.adobe.serialization.json.*;
+			import com.google.zxing.client.result.BookmarkDoCoMoResultParser;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.XMLListCollection;
+			import mx.controls.Alert;
+			import mx.controls.Menu;
+			import mx.controls.treeClasses.TreeItemRenderer;
+			import mx.core.UITextField;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.events.MenuEvent;
+			import mx.managers.SystemManager;
+			import mx.rpc.AbstractOperation;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.skins.spark.EditableComboBoxSkin;
+			import mx.utils.UIDUtil;
+			
+			public  var m_iHouse:iHouseResourceManager;
+			public  var ImageGroup:ArrayCollection   =new ArrayCollection();
+			public  var m_loader:URLLoader = new URLLoader();
+			public  var m_strData:String;
+			public  var m_strFloder:String = "";
+			
+			public var bModify:Boolean = false;
+			
+			private var menuTree:Menu;		
+			
+			private var node1Name:String= "";
+			private var node2Name:String= "";
+			private var node3Name:String= "";
+			
+			public function init() : void
+			{
+				mModelDialog.m_iHouse = m_iHouse;
+				mModelDialog.init();
+				mEditDlg.m_iHouse		 = m_iHouse;
+				mModifyClassDlg.m_iHouse = m_iHouse;
+				mUpdateModelDlg.m_iHouse = m_iHouse;
+
+				var menuItems:Array = new Array();				
+				menuTree = Menu.createMenu(this, menuItems, false);
+				menuTree.variableRowHeight = true; 
+				menuTree.addEventListener(MenuEvent.ITEM_CLICK, tree_MenuItemSelected);  //右键菜单的事件
+				mFurniture.addEventListener(MouseEvent.RIGHT_CLICK,treeRightClick);
+				mFurniture.addEventListener(MouseEvent.RIGHT_MOUSE_DOWN,rightClick);
+				mFurniture.addEventListener(MouseEvent.CLICK,treeClick);
+			}
+			
+			private function rightClick(evt:MouseEvent):void
+			{
+				if(evt.target!=null&&evt.target is UITextField && UITextField(evt.target).owner!=null)
+				{
+					mFurniture.selectedItem= TreeItemRenderer(UITextField(evt.target).owner).data;
+				}
+				else
+				{
+					mFurniture.selectedItem = null;
+				}
+			}  
+			
+			//树右击事件
+			private function treeRightClick(e:MouseEvent):void
+			{
+				//非管理员禁止操作
+				if(m_iHouse.mStrAdministrator != "1")
+					return;
+				
+				var menuItems:Array = new Array();
+				var menuAdd:Object= new Object;  
+				menuAdd.label = "添加分类";
+				menuItems.push(menuAdd);			
+ 				
+				if(mFurniture.selectedItem )
+				{
+					if( mFurniture.getParentItem(mFurniture.selectedItem) == null )
+					{
+						var menuChildAdd:Object= new Object;  
+						menuChildAdd.label = "添加子分类";
+						menuItems.push(menuChildAdd);
+					}
+					else
+					{
+						if( mFurniture.getParentItem(mFurniture.getParentItem(mFurniture.selectedItem))== null )
+						{
+							var menuChildAdd:Object= new Object;  
+							menuChildAdd.label = "添加子分类";
+							menuItems.push(menuChildAdd);						
+						}
+					}
+					
+					var menuModify:Object= new Object;  
+					menuModify.label = "修改分类";
+					menuItems.push(menuModify);	
+				}
+				
+				var menuDel:Object=new Object();
+				menuDel.label="删除分类";
+				menuItems.push(menuDel);
+				
+/* 				var menuModify:Object=new Object();
+				menuModify.label="修改分类";
+				menuItems.push(menuModify); */
+				
+				menuTree.dataProvider = menuItems;
+
+				var point:Point = new Point(mouseX,mouseY);  
+				point = localToGlobal(point);   
+				menuTree.show(point.x,point.y);  //显示右键菜单
+			}
+			
+			private function treeClick(e:MouseEvent):void
+			{
+				if(menuTree!=null)
+					menuTree.hide();
+			}
+			
+			//点击菜单，相应方法 
+			private function tree_MenuItemSelected(event:MenuEvent):void	
+			{
+				//非管理员禁止操作
+				if(m_iHouse.mStrAdministrator != "1")
+					return;
+				
+				var menuItem:Object = event.menu.selectedItem as Object;
+				switch(menuItem.label)
+				{
+					case "添加分类":
+					{
+						mEditDlg.x = mouseX;
+						mEditDlg.y = mouseY;						
+						mEditDlg.show(false);
+					}
+						break;
+					case "添加子分类":
+					{
+ 						mEditDlg.x = mouseX;
+						mEditDlg.y = mouseY; 
+						mEditDlg.show(true);	
+					}
+						break;
+					case "删除分类":
+					{
+							OnDeleteNode();
+					}
+						break;
+					
+					case "修改分类":
+					{
+						mModifyClassDlg.x = mouseX;
+						mModifyClassDlg.y = mouseY;
+							
+						OnModifyNode();
+					}
+						break;					
+				}
+			}			
+			
+			public function OnAddClass(strName:String):void
+			{
+				if( mFurniture.selectedItem == null )
+					return;			
+	
+				var xml:XML=XML(mFurniture.selectedItem);		
+				xml.parent().appendChild(new XML(<Class Name ={strName} />));
+				
+				mFurniture.selectedItem = null;
+				mFurniture.selectedIndex= -1;	
+			}
+			
+			public function OnAddChildClass(strName:String):void
+			{
+				if( mFurniture.selectedItem == null )
+					return;			
+				
+				var xml:XML=XML(mFurniture.selectedItem);		
+				xml.appendChild(new XML(<Class Name ={strName} />));
+				
+				mFurniture.selectedItem = null;
+				mFurniture.selectedIndex= -1;		 
+			}
+			
+			/**
+			 * 删除节点
+			 * 
+			 */			
+			private function OnDeleteNode():void
+			{
+				if( mFurniture.selectedItem == null )
+					return;
+				
+				if( ImageGroup.length > 0 )
+				{
+					m_iHouse.mAlertDialog.show("分类已经有模型，不能删除.");
+					return;
+				}
+				
+				m_iHouse.mYesNoDialog.mYes.label = "是";  
+				m_iHouse.mYesNoDialog.mNo.label  = "否";
+				m_iHouse.mYesNoDialog.show("是否删除：["+mFurniture.selectedItem.@Name+"]",OnDeleteMSG,OnDeleteMSG_NO);	
+				
+				//Alert.show("是否删除：["+mFurniture.selectedItem.@Name+"]","",Alert.YES|Alert.NO,this,OnDeleteMSG);		
+			}
+			
+			private function OnDeleteMSG():void
+			{
+				var node:XML=XML(mFurniture.selectedItem);
+				
+				// 获取当前节点的父节点下的所有子节点
+				var children:XMLList=XMLList(node.parent()).children();
+				
+				// 将其转换为 XMLListCollection
+				var childrenCol:XMLListCollection=new XMLListCollection(children);
+				
+				// 获取选中节点索引，并删除该节点
+				var i:Number=childrenCol.getItemIndex(node);
+				
+				childrenCol.removeItemAt(i); 												
+			}
+			
+			private function OnDeleteMSG_NO():void
+			{
+				
+			}
+			
+			public var treeNode:XML;
+			public function OnModifyNode():void
+			{
+				if( mFurniture.selectedItem == null )
+					return;
+				
+				treeNode=XML(mFurniture.selectedItem);
+				var nodeTemp:XML=XML(mFurniture.selectedItem);
+				var selNodeName:String = treeNode.@Name;
+				
+				var strClass1:String = "";
+				var strClass2:String = "";
+				var strClass3:String = "";
+				
+				var iIndex:int = 0;
+				while(nodeTemp.Class.length() > 0)
+				{
+					++iIndex;
+					nodeTemp = nodeTemp.Class[0];
+				}
+				
+				//点击的是一级分类
+				if(2 == iIndex)
+				{
+					strClass1 = treeNode.@Name;
+				}
+				//点击的是二级分类
+				else if(1 == iIndex)
+				{
+					strClass1 = treeNode.parent().@Name;
+					strClass2 = treeNode.@Name;
+				}
+				//点击的是三级分类
+				else if(0 == iIndex)
+				{
+					strClass1 = treeNode.parent().parent().@Name;
+					strClass2 = treeNode.parent().@Name;
+					strClass3 = treeNode.@Name;
+				}
+				
+				mModifyClassDlg.ModifyModelClass(strClass1,strClass2,strClass3,selNodeName);
+			}
+			
+			//修改分类 
+			public function OnModifyClass(strClass1:String,strClass2:String,strClass3:String,strNewName:String):void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("ModifyModelClass");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT, OnModifyModelClassFault);
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnModifyModelClassResult);
+				op.send(strClass1,strClass2,strClass3,strNewName);				
+			}
+
+			public function OnModifyModelClassResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,  OnModifyModelClassFault);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnModifyModelClassResult);				
+				
+				var jsonStr:String = e.result.toString();
+				var jsonObj:Object = com.adobe.serialization.json.JSON.decode(jsonStr); 
+				
+				//成功
+				if("1" == jsonObj.success)
+				{
+					treeNode.@Name = jsonObj.newName;
+				}
+				else
+				{
+					m_iHouse.mAlertDialog.show(jsonObj.nofityMsg);
+				}
+			}	
+			
+			private function OnModifyModelClassFault(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnModifyModelClassFault);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnModifyModelClassResult);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试.");	 
+			}
+
+			// 获取模型分类+产品名称
+			//===================================================================================================
+			public function UpdateDB():void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("GetInfoFromModel");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT, OnError);
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnResult);
+				op.send(m_iHouse.mStrCompanyID,m_iHouse.mStrAccountType);
+			}
+		
+			private function OnError(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnError);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnResult);
+				m_iHouse.mAlertDialog.show("系统繁忙,请重试.");	 
+			}			
+			
+			public var m_InfoArray:Array;
+			public var m_classXML:XML;
+			public function OnResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,  OnError);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnResult);
+				
+				var str:String = e.result.toString();
+				m_InfoArray = str.split("#");
+
+				m_classXML= new XML(<root></root>); // XML根节点
+				
+				if( m_InfoArray.length <=1 )
+				{
+					var classXML:XML =  new XML(<Class Name ={"客餐厅"}></Class>);
+					m_classXML=m_classXML.appendChild(classXML);
+				}				
+				// 得到分类一
+				//===============================================================================================
+				var strClassArray1:Array = new Array();
+				var strClassArray2:Array = new Array();
+				var strClassArray3:Array = new Array();
+				for( var i:int = 1;i<m_InfoArray.length; i++ )  
+				{
+					var strRecordArray:Array = m_InfoArray[i].split("~");
+						
+					var bEnable:Boolean = true;
+					for(var j:int =0; j<strClassArray1.length; j++ )
+					{
+						if( strRecordArray[0] == strClassArray1[j] )
+						{
+							bEnable = false;
+							break;
+						}
+					}
+					
+					if( bEnable == true )
+					{
+						strClassArray1.push(strRecordArray[0]);
+						var classXML1:XML =  new XML(<Class Name ={strRecordArray[0]}></Class>);
+						m_classXML=m_classXML.appendChild(classXML1);
+					
+						// 得到分类二
+						//========================================================================================
+						strClassArray2.length = 0;
+						for( var m:int = 1;m<m_InfoArray.length; m++ )  
+						{
+							var strRecordArray2:Array = m_InfoArray[m].split("~");
+							
+							var bEnable2:Boolean = true;
+							
+							if( strClassArray2.length == 0 )
+							{
+								if( strRecordArray2[0] != strRecordArray[0])	// 分类一相同
+									bEnable2 = false;
+							}
+							else
+							{	
+								for(var n:int =0; n<strClassArray2.length; n++ )
+								{
+									if( strRecordArray2[0] != strRecordArray[0] ||
+										strRecordArray2[1] == strClassArray2[n])	
+									{
+										bEnable2 = false;
+										break;
+									}
+								}
+							}
+							
+							if( bEnable2 == true )
+							{
+								strClassArray2.push(strRecordArray2[1]);
+								var classXML2:XML =  new XML(<Class Name ={strRecordArray2[1]}></Class>);
+								classXML1=classXML1.appendChild(classXML2);
+								
+								// 得到分类三
+								strClassArray3.length = 0;
+								for( var a:int = 1;a<m_InfoArray.length; a++ )  
+								{
+									var strRecordArray3:Array = m_InfoArray[a].split("~");
+									
+									var bEnable3:Boolean = true;
+									
+									if( strClassArray3.length == 0 )	// 分类1,2相同
+									{
+										if(	strRecordArray3[0] != strRecordArray[0] ||
+											strRecordArray3[1] != strRecordArray2[1] )	
+											bEnable3 = false;
+										
+									}
+									else
+									{
+										for(var b:int =0; b<strClassArray3.length; b++ )
+										{
+											if(	strRecordArray3[0] != strRecordArray[0] ||
+												strRecordArray3[1] != strRecordArray2[1]||
+												strRecordArray3[2] == strClassArray3[b] )	
+											{
+												bEnable3 = false;
+												break;
+											}
+										}
+									}
+								
+									if( bEnable3 == true )
+									{
+										strClassArray3.push(strRecordArray3[2]);
+										classXML2=classXML2.appendChild(new XML(<Class Name ={strRecordArray3[2]}></Class>));
+									}
+								}
+							}
+						}
+					}
+				}
+
+				mFurniture.dataProvider = new XMLListCollection(m_classXML.Class);
+				mFurniture.selectedIndex = 0;
+				mFurniture.expandChildrenOf(mFurniture.selectedItem,true);
+			}			
+			
+			public var curPage:int; 	    // 当前页码
+			public var totalPage:int;      	// 总页数 
+			public var totalCount:int; 	    // 总记录条数 
+			public var pageCount:int = 20;	// 每页包含的记录数，默认6条 
+			private var mypagedata:ArrayCollection = new ArrayCollection();
+			public function setPager(value:int):void              
+			{                  
+				if(value <0 || (value+1)>totalPage)
+				{                      
+					return;  
+				}                  
+				curPage = value;                 		 // 计算跳转到页面中的第一条记录所在记录中是第几条记录       
+				var curNum : int = value*pageCount;      // 清空当前显示的数据记录 
+				
+				mypagedata.removeAll();
+				for(var i:int = 0; curNum < ImageGroup.length && i< pageCount; i++,curNum++)
+				{                      
+					mypagedata.addItem(ImageGroup.getItemAt(curNum));  
+				}    
+				
+				var temp:int=curPage+1;                  
+				pagedetail.text = "第"+temp+"页/共"+totalPage+"页 共"+totalCount+"条记录";
+				
+				tileList.dataProvider = mypagedata;	
+				inputpage.value = temp;	
+			}	
+			
+			
+			public function OnChange(event:ListEvent):void			
+			{
+				 node1Name= "";
+				 node2Name= "";
+				 node3Name= "";
+				
+				if( mFurniture.selectedItem == null )
+					return;
+					
+				// 一级分类
+				if( mFurniture.getParentItem(mFurniture.selectedItem) == null )				
+					return;
+				else
+				{
+					// 二级分类
+					if(mFurniture.getParentItem(mFurniture.getParentItem(mFurniture.selectedItem)) == null )
+					{
+ 						//var node11:XML=XML(mFurniture.getParentItem(mFurniture.selectedItem));
+						//var node12:XML=XML(mFurniture.selectedItem);
+						//DoSql(node11.@Name,node11.@Name,"");
+						return;
+					}
+					
+					var node1:XML=XML(mFurniture.getParentItem(mFurniture.getParentItem(mFurniture.selectedItem)));
+					var node2:XML=XML(mFurniture.getParentItem(mFurniture.selectedItem));
+					var node3:XML=XML(mFurniture.selectedItem);
+					DoSql(node1.@Name,node2.@Name,node3.@Name);	
+					
+					node1Name= node1.@Name;
+					node2Name= node2.@Name;
+					node3Name= node3.@Name;
+				}	
+			}
+			
+			/***
+			 * 查询内容
+			 * 
+			 */
+			private var m_strClass1:String;
+			private var m_strClass2:String;
+			private var m_strClass3:String;
+			public function DoSql(str1:String,str2:String,str3:String):void
+			{
+				m_strClass1 = str1;
+				m_strClass2 = str2;
+				m_strClass3 = str3;
+				
+				var strTemp:String = "select * from model where class1 ='{0}' and class2='{1}' and class3='{2}' and mode=2";
+				var strSql:String =  mx.utils.StringUtil.substitute(strTemp,str1,str2,str3);
+		
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("DoSql");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnErrorSql);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnResultSql);
+				op.send(strSql,'6E897B0F-1440-7196-96C1-05C879E9399A',m_iHouse.mStrUserID,m_iHouse.mStrAccountType);			
+			}
+			
+			private function OnErrorSql(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnErrorSql);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResultSql);
+				m_iHouse.mAlertDialog.show("系统繁忙,请重试.");	 
+			}			
+			
+			public function OnResultSql(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnErrorSql);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResultSql);
+				
+				m_strData   = e.result.toString();
+				m_strFloder = m_iHouse.mDataProcess.webserviceAddr+"ihouse/data/jiaju/";
+				ShowModelRecord();
+			} 
+					
+			/*加入显示list表  */
+			public function ShowModelRecord():void
+			{
+				mypagedata.removeAll();
+				ImageGroup.removeAll();
+				var recordArray:Array = m_strData.split("#");
+				if( recordArray.length <=1 )
+					return;
+				
+				var times:Date = new Date;
+				m_strFloder =m_iHouse.mDataProcess.webserviceAddr+"ihouse/data/jiaju/";
+								
+				for( var i:int = recordArray.length-1;i>=0; i-- )  
+				{
+					var strRecordArray:Array = recordArray[i].split("~");
+					
+					if( strRecordArray[0] == m_strClass1 && strRecordArray[1] == m_strClass2 &&
+						strRecordArray[2] == m_strClass3 && strRecordArray[7] == 2)
+					{
+						var strTmp:String   = m_strFloder+strRecordArray[5]+"?"+String(times.milliseconds);
+						
+						//是否可以操作(超级管理员、企业用户可操作，设计师只操作自己模型，普通用户只查看)
+						var bEdit:Boolean = ("1" == m_iHouse.mStrAdministrator) ? true : false;
+						
+						var strModeName:String = "";
+						if(strRecordArray.length > 17 && "" != strRecordArray[16])
+							strModeName = strRecordArray[16];
+						else
+							strModeName = strRecordArray[3];
+						
+						ImageGroup.addItem(
+							{
+								thumbnailImage:strTmp, 
+								ImageX:1, ImageY:1, 
+								data:strRecordArray,
+								bCheck:false, 
+								mParent:this,
+								editable:bEdit,
+								modelname:strModeName
+							});
+					}
+				}
+				
+				if( ImageGroup.length > 0) 
+				{
+					totalCount = ImageGroup.length;
+					totalPage = (totalCount + pageCount -1)/pageCount;
+					
+					inputpage.minimum=1; 
+					inputpage.maximum= totalPage; 
+					
+					setPager(0);  
+				}
+				else
+				{
+					totalCount 	= 0;
+					totalPage 	= 0;
+					curPage 	= 0;
+					inputpage.minimum= 0;
+					inputpage.maximum= 0;
+					pagedetail.text = "第 0 页/共 0 页 共 0 条记录";  
+				}	
+				
+			}
+			
+			public function OnNofityMsg():void
+			{
+				
+			}
+			
+			/***
+			 * 删除记录
+			 * 
+			 */
+			public function DeleteRecord(recordArray:Array, Obj:Object):void
+			{
+				//非管理员禁止操作
+				if(m_iHouse.mStrAdministrator != "1")
+				{
+					m_iHouse.mYesNoDialog.show("非管理员，禁止删除!",OnNofityMsg,OnNofityMsg);
+					return;
+				}
+				
+				var iIndex:int = mypagedata.getItemIndex(Obj);				
+				if( -1 == iIndex )
+					return;	
+				
+				m_iHouse.mAlertDialog.show("是否删除当前记录");
+				m_iHouse.mAlertDialog.mRecordArray = recordArray;
+				m_iHouse.mAlertDialog.mObj 		   = Obj;
+				m_iHouse.mAlertDialog.mMatView     = false;
+			}
+			
+			public function DeleteRecord1(recordArray:Array, Obj:Object):void
+			{				
+				var iIndex:int = mypagedata.getItemIndex(Obj);				
+				if( -1 == iIndex )
+					return;
+				
+				mypagedata.removeItemAt(iIndex);
+				iIndex = ImageGroup.getItemIndex(Obj);
+				
+				if( -1 != iIndex )
+				{
+					ImageGroup.removeItemAt(iIndex);
+				}
+				
+				
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("DeleteModel");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT, OnErrorDEL);
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnResultDEL);
+				op.send(recordArray[0],recordArray[1],recordArray[2],recordArray[3] ,recordArray[5] );
+			}
+			
+			private function OnErrorDEL(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnErrorDEL);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnResultDEL);
+				m_iHouse.mAlertDialog.show("系统繁忙,请重试.");	 
+			}			
+			public function OnResultDEL(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,  OnErrorDEL);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnResultDEL);				
+				var strResult:String = e.result.toString();
+				
+				if("1" == strResult)
+				{
+					m_iHouse.mDataView.ExportModelAll();
+					
+					//如果有产品信息时，也需要导出
+					if("1" == m_iHouse.mDataProcess.mProductInfo)
+						m_iHouse.mDataView.ExportProductAll();
+				}
+			}
+			/***
+			 * 修改记录
+			 * 
+			 */
+			
+			public function ModifyRecord(recordArray:Array):void
+			{
+				//非管理员禁止操作
+				if(m_iHouse.mStrAdministrator != "1")
+				{
+					m_iHouse.mYesNoDialog.show("非管理员，禁止修改!",OnNofityMsg,OnNofityMsg);
+					return;
+				}
+				
+				if( String(recordArray[9]) == "" )
+					return;
+				
+				m_iHouse.mUploadFileDlg.OnReset();
+				m_iHouse.mUploadFileDlg.mTree.dataProvider = new XMLListCollection(m_classXML.Class);
+				m_iHouse.mUploadFileDlg.ModifyShow(recordArray[9]);
+			}
+			
+            //----------------------------------加载A3d模型---------------------------------------------
+			public var mRecordArray:Array;
+			public function Show3D(recordArray:Array):void
+			{
+				mRecordArray = recordArray;
+
+				var times:Date = new Date;
+				addEventListener("iHouse3DViewClose",OnClose3DView);
+				
+				m_iHouse.mSWFA3DLoader.addEventListener(Event.COMPLETE, ShowComplete);				
+				m_iHouse.mSWFA3DLoader.load("iHouse3DView.swf"+"?"+String(times.milliseconds));
+			}
+			
+			private var mObj:SystemManager;
+			private function ShowComplete(e:Event):void
+			{
+				m_iHouse.mSWFA3DLoader.removeEventListener(Event.COMPLETE, ShowComplete);
+				mObj = m_iHouse.mSWFA3DLoader.content as SystemManager;
+				
+				if( mObj == null )   
+				{
+					m_iHouse.mAlertDialog.show("加载iHouse3DView失败");
+					return;
+				}
+				
+				mObj.addEventListener(FlexEvent.APPLICATION_COMPLETE,comp); 
+			}
+			
+			private function comp(e:Event):void  
+			{ 
+				mObj.removeEventListener(FlexEvent.APPLICATION_COMPLETE,comp);		
+				
+				e.target.application.OnInit(this);//调用对方接口
+				mWnd =e.target.application;
+				myTimer.addEventListener ( TimerEvent.TIMER, OnTimerInitComplete );
+				myTimer.start();
+			}
+			
+			public  var mWnd:*;
+			private var myTimer:Timer = new Timer (300);
+			private function OnTimerInitComplete( pEvt:TimerEvent ):void
+			{
+				if(mWnd.IsInitComplete() == true)
+				{
+					m_iHouse.ChangeTabView(1);
+					
+					mWnd.Show3DView(m_strFloder,mRecordArray);
+					myTimer.removeEventListener(TimerEvent.TIMER, OnTimerInitComplete );
+					myTimer.stop();		
+				}
+			}
+			
+			public function OnClose3DView(e:Event):void
+			{
+				removeEventListener("iHouse3DViewClose",OnClose3DView);
+				
+				m_iHouse.ChangeTabView(2);
+			}		
+					
+			public function ShowProductInfoDlg(recordArray:Array):void
+			{
+				if(m_iHouse.mStrAdministrator != "1")
+				{
+					m_iHouse.mAlertDialog.show("非管理员，禁止修改商品价格!");
+					return;
+				}
+				
+				//北京
+				if("4" == m_iHouse.mStrCompanyID)
+				{
+					m_iHouse.mUploadProductBJDlg.Show(recordArray[9]);
+				}
+				else
+				{
+				   m_iHouse.mUploadProductDlg.Show(recordArray[9],recordArray[5]);
+				}
+			}
+			
+			public function ShowClassDlg(recordArray:Array):void
+			{
+				if(m_iHouse.mStrAdministrator != "1")
+				{
+					m_iHouse.mAlertDialog.show("非管理员，禁止修改分类!");
+					return;
+				}
+				
+				m_iHouse.mChangeModelClassDlg.Show(recordArray);
+			}
+
+			
+			public function OnChangeVRScene():void
+			{
+				mModelDialog.OnShow();
+			}
+			
+			public function OnUploadFile():void
+			{
+				if( m_classXML )	
+					m_iHouse.mUploadFileDlg.mTree.dataProvider = new XMLListCollection(m_classXML.Class);
+				
+				m_iHouse.mUploadFileDlg.AddShow(node1Name,node2Name,node3Name);
+			}
+			
+			public function ShowMaterialView():void
+			{
+				this.visible = false;
+				if(m_iHouse.mDataMatView.m_InfoArray == null )
+				{
+					m_iHouse.mDataMatView.UpdateDB();
+				}
+				else
+				{
+					m_iHouse.mDataMatView.ShowModelRecord();
+				}
+				m_iHouse.mDataMatView.visible = true;
+			}
+			
+			/***
+			 * 导出模型
+			 * 
+			 */
+			public function ExportModel():void
+			{
+				mUpdateModelDlg.visible = true;
+			}
+			
+			public function ExportModelSelect():void
+			{
+				var strName:String = "1";
+				for( var i:int =0; i< ImageGroup.length; i++ )
+				{
+					if( ImageGroup[i].bCheck == true )
+					{
+						strName+="+"+ImageGroup[i].data[3];
+					}
+				}
+			//	m_iHouse.mHelpDialog.show(strName);
+				var strUUID:String = UIDUtil.createUID();
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("ExportModelSelect");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT, OnErrorExportSelect);
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnResultExportSelect);
+				op.send(strName,strUUID);				
+			}
+			
+			private function OnErrorExportSelect(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnErrorExportSelect);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnResultExportSelect);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试. 1002");
+			}			
+			public function OnResultExportSelect(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,  OnErrorExportSelect);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnResultExportSelect);				
+				var str:String = e.result.toString();
+				//m_iHouse.mHelpDialog.show("已选择的模型更新完成!");
+				m_iHouse.mHelpDialog.show("已更新");      
+			}			
+			  
+			public function ExportModelAll():void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("ExportModel");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT, OnErrorExport);
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnResultExport);
+				op.send();	 			
+			}
+			
+			private function OnErrorExport(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnErrorExport);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnResultExport);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试. 1001");
+			}			
+			public function OnResultExport(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,  OnErrorExport);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnResultExport);				
+				var str:String = e.result.toString();
+				//m_iHouse.mHelpDialog.show("转换完成!");
+			}	
+			
+			public function ExportProductAll():void
+			{				
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("ExportProduct");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT, OnErrorExportProduct);
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnResultExportProduct);
+				op.send();				
+			}
+			
+			private function OnErrorExportProduct(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnErrorExportProduct);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnResultExportProduct);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试.");	 
+			}			
+			public function OnResultExportProduct(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,  OnErrorExportProduct);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnResultExportProduct);				
+				var str:String = e.result.toString();
+				//m_iHouse.mHelpDialog.show("完成!");   
+			}	
+			
+			public function OnShowImage():void  
+			{
+				if( tileList.selectedIndex == -1 )
+					return;  
+
+			//	var strSize:String = mypagedata[tileList.selectedIndex].data[4];
+			//	var isize:Array = strSize.split("-");
+			//	m_iHouse.mShowRendering.ShowDialog(isize[0],isize[1]);
+			
+			}
+			
+			public function SetButtonState():void
+			{
+				//UploadFile.visible   = ("1" == m_iHouse.mStrAdministrator)  ? true : false;
+				ChangePath.visible   = ("1" == m_iHouse.mStrAdministrator)  ? true : false;
+				Add.visible          = ("1" == m_iHouse.mStrAdministrator)  ? true : false;
+			}
+			
+		]]>
+	</fx:Script>  
+	
+	<s:Rect id="mLine" left="1" bottom="54" right="1" height="2">
+		<s:fill>
+			<s:SolidColor color="#000000"/>
+		</s:fill>
+	</s:Rect>	
+	
+	<s:Rect id="mBottomRect" left="1" bottom="0" right="1" height="54" >
+		<s:fill>
+			<s:SolidColor color="#191B21"/>
+		</s:fill>
+	</s:Rect>	
+
+	
+	<mx:Tree id="mFurniture" left="1" top="45"  width="196" bottom="60" fontFamily="宋体"
+			 fontSize="15" labelField="@Name" change="OnChange(event);" />
+	<s:List id="tileList" left="201" top="5" right="5"  bottom="56"  borderVisible="false"
+			contentBackgroundAlpha="1.0" dataProvider="{mypagedata}" contentBackgroundColor="#F7F7F7"  
+		    doubleClick="OnShowImage();"  skinClass="Skins.LeftBarListSkin" doubleClickEnabled="true" 
+			itemRenderer="Skins.FurnitureItemRenderer" verticalScrollPolicy="on" horizontalScrollPolicy="on">	
+	</s:List>	  
+	
+	<s:Button id="ChangePath" right="310" bottom="10" width="120" label="转换" buttonMode="true"
+			  click="OnChangeVRScene();" skinClass="Skins.NormalCreateBtnSkin" visible="false"/>
+	
+<!--	<s:Button id="UploadFile" right="310" bottom="10" width="120" label="生成使用库" buttonMode="true"
+			  click="ExportModel();" skinClass="Skins.NormalCreateBtnSkin"/>-->
+	
+	<s:Button id="Add" right="170" bottom="10" width="120" label="新增加" buttonMode="true"
+			  click="OnUploadFile();" skinClass="Skins.NormalCreateBtnSkin"/>	
+	
+	
+	<s:Group id="mGroup2" left="300" bottom="13" width="410" color="#FFFFFF" fontFamily="宋体"
+			 fontSize="16">
+		<mx:LinkButton x="0"  y="0" width="60" label="首页" click="setPager(0);"/>
+		<mx:LinkButton x="70" y="0" width="60" label="上页" click="setPager(curPage - 1);"/>         
+		<mx:LinkButton x="140" y="0" width="60" label="下页" click="setPager(curPage + 1);" textAlign="left"/>         
+		<mx:LinkButton x="210" y="0" label="末页" click="setPager(totalPage - 1);"/>          		        
+		<mx:NumericStepper id="inputpage" x="280" y="0" width="60" height="25" color="#000000" maximum="0" minimum="0" stepSize="1"/> 		
+		<mx:LinkButton x="350" y="0" width="60" label="跳转" click="setPager(inputpage.value - 1);"/>  
+	</s:Group>
+	
+	
+	<mx:Label id="pagedetail" left="30" bottom="15" color="#FFFFFF" fontFamily="宋体" fontSize="16" text="第 0 页/共 0 页"/>	
+	<local:ModelChangeDlg id="mModelDialog" x="{(this.width-mModelDialog.width)/2}" y="{(this.height-mModelDialog.height)/2-48}" visible="false"  />
+<!--	<local:UploadModelDlg id="mUploadFileDlg" x="{(this.width-mUploadFileDlg.width)/2}" y="{(this.height-mUploadFileDlg.height)/2-48}" visible="false"  />
+-->	<UI:EditDlg id="mEditDlg"  visible="false"  />
+	<UI:ModifyClassDlg id="mModifyClassDlg"  visible="false"  />
+	<s:Button left="1" top="1" width="104" height="44" label="模型库" enabled="false" fontFamily="宋体"
+			  skinClass="Skins.CommonButton"/>
+	<s:Button left="106" top="1" width="91" height="44" label="材料库" click="ShowMaterialView();"
+			  fontFamily="宋体" skinClass="Skins.CommonButton"/>
+	<UI:UpdateModelDlg id="mUpdateModelDlg" x="{(this.width-mUpdateModelDlg.width)/2}" y="{(this.height-mUpdateModelDlg.height)/2-48}" visible="false"  />
+
+	<s:SWFLoader id="swfLoader" left="5" top ="45" right="5" bottom="5" visible="false"/>	
+</s:Group>

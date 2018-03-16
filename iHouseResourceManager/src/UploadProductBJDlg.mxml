@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="350" height="280" fontFamily="宋体"
+		 fontSize="26" fontStyle="italic" fontWeight="bold">
+	
+	<fx:Script>
+		<![CDATA[	
+			import com.google.zxing.client.result.BookmarkDoCoMoResultParser;
+			
+			import mx.core.UIComponent;
+			import mx.rpc.AbstractOperation;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.InvokeEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			public var m_iHouse:iHouseResourceManager;
+			
+			private var strModelUUID:String;
+			
+			private var strProductID:String  = "";   //商品ID
+			private var strName:String  = "";   //名称
+			private var strType:String  = "";   //类型
+
+			private var bGetProductInfo:Boolean = false;
+						
+			public function Show(modelUUID:String):void
+			{
+				ClearData();
+				strModelUUID = modelUUID;
+				bGetProductInfo = false;
+				this.visible = true;
+				
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("GetProductBJ");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnGetResult);
+				m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnGetFault);
+				
+				//获取商品信息
+				op.send(m_iHouse.mStrCompanyID, modelUUID);
+			}
+			
+			//清空界面控件数据
+			private function ClearData():void
+			{
+				//通过反射机制取出当前MXML中的信息  
+				var instanceInfo:XML=describeType(this); 
+				var properties:XMLList =instanceInfo..accessor.(@type=="spark.components::TextInput")      
+				
+				for each(var propertyInfo:XML in properties)
+				{  
+					//此处取出的为control的id     
+					var propertyName:String =propertyInfo.@name;
+					TextInput(this[propertyName]).text="";  
+				}
+			}
+			
+			private function Check():Boolean
+			{
+				strName = mTextName.text;   //名称
+				strProductID = mTextCode.text;   //编码
+				
+				if("" == strName)
+				{
+					m_iHouse.mAlertDialog.show("名称不能为空!");
+					return false;
+				}
+				
+				if("" == strProductID)
+				{
+					m_iHouse.mAlertDialog.show("商品编码不能为空!");
+					return false;
+				}
+
+				return true;
+			}
+
+			protected function OnAdd(event:MouseEvent):void
+			{
+				if(!Check())
+					return;
+				
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("AddProductBJ");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnAddResult);
+				m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnAddFault);
+				op.send(strModelUUID,
+					    m_iHouse.mStrCompanyID, //公司ID
+					    mTextCode.text ,        //代码
+					    mTextName.text ,        //名称
+						mTextURL.text           //产品URL
+						);     				
+			}
+			
+			protected function OnUpdate(event:MouseEvent):void
+			{
+				if(!Check())
+					return;
+									
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("UpdateProductBJ");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnUpdateResult);
+				m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnUpdateFault);
+				op.send(strModelUUID,
+					    m_iHouse.mStrCompanyID, //公司ID
+						mTextCode.text ,        //代码
+						mTextName.text ,        //名称
+						mTextURL.text);   
+			}
+			
+			public function OnNewFile_No():void
+			{			
+			}   
+			
+			public function OnNewFile_Yes():void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService2.getOperation("DeleteProductBJ");
+				m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnDeleteResult);
+				m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnDeleteFault);
+				op.send(strModelUUID,m_iHouse.mStrCompanyID);				
+			}
+			
+			protected function OnDelete(event:MouseEvent):void
+			{
+				m_iHouse.mYesNoDialog.mYes.label = "确定";  
+				m_iHouse.mYesNoDialog.mNo.label  = "取消";
+				m_iHouse.mYesNoDialog.show("是否删除",OnNewFile_Yes,OnNewFile_No);								
+			}
+			
+			private function OnGetResult(event:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnGetResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnGetFault);
+				
+				var strData:String = event.result.toString();
+				var strArray:Array = strData.split("#");
+				
+                if(strArray.length > 1)
+				{	
+					var strProduct:String = strArray[1];
+					
+					var strProductArray:Array = strProduct.split("~");
+					if(0 == strProductArray.length)
+						return;
+					
+					mTextCode.text =strProductArray[2];  //代码
+					strProductID =strProductArray[2];  //为了做修改
+					mTextName.text =strProductArray[3];  //名称
+					mTextURL.text =strProductArray[4]; //URL
+
+					bGetProductInfo = true;  //有取到产品数据
+				}
+				
+				mAdd.visible = !bGetProductInfo;
+				mUpdate.visible = bGetProductInfo;
+				mDelete.visible = bGetProductInfo;
+			}
+			
+			private function OnGetFault(event:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnGetResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnGetFault);
+				
+				m_iHouse.mHelpDialog.show("获取产品失败,失败原因:"+event.toString());
+			}
+			
+			private function OnAddResult(event:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnAddResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnAddFault);
+				
+				m_iHouse.mAlertDialog.show("增加成功!");
+				visible = false;
+			}
+			
+			private function OnAddFault(event:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnAddResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnAddFault);
+				
+				m_iHouse.mAlertDialog.show("增加失败,失败原因：" + event.toString());
+			}
+			
+			private function OnUpdateResult(event:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2..removeEventListener(ResultEvent.RESULT,OnUpdateResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnUpdateFault);
+				
+				m_iHouse.mAlertDialog.show("更新成功!");
+				visible = false;
+			}
+			
+			private function OnUpdateFault(event:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2..removeEventListener(ResultEvent.RESULT,OnUpdateResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnUpdateFault);
+				
+				m_iHouse.mAlertDialog.show("更新失败,失败原因：" + event.toString());
+			}
+			
+			private function OnDeleteResult(event:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnDeleteResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnDeleteFault);
+				
+				m_iHouse.mAlertDialog.show("删除成功!");
+				visible = false;
+			}
+			
+			private function OnDeleteFault(event:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(ResultEvent.RESULT,OnDeleteResult);
+				m_iHouse.mDataProcess.mWebService2.removeEventListener(FaultEvent.FAULT,OnDeleteFault);
+				
+				m_iHouse.mAlertDialog.show("删除失败,失败原因：" + event.toString());
+			}
+			
+			public  function OnClose():void
+			{
+				this.visible = false;  
+			}	
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<mx:Blur id="blurOn" blurXFrom="0.0" blurXTo="10.0" blurYFrom="0.0" blurYTo="10.0"/>
+		<mx:Blur id="blurOut" blurXFrom="10.0" blurXTo="0.0" blurYFrom="10.0" blurYTo="0.0"/>
+	</fx:Declarations>	
+	<s:Rect x="-1000" y="-1000" width="5000" height="5000" alpha="0.5">
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>		
+	<s:Group left="0" right="0" top="0" bottom="0" >
+		<s:Group left="10" right="35" top="20" height="45" mouseDown="this.startDrag();" mouseUp="this.stopDrag()"/>	
+			<s:Rect right="5" top="5" left="5" bottom="5" radiusX="5">
+			<s:fill>
+				<s:SolidColor color="#ffffff"/>
+			</s:fill>		
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="8" blurY="8" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 		
+		</s:Rect>	
+		<s:Rect right="-5" top="-5" width="35" height="35" radiusX="45">
+			<s:stroke>
+				<s:SolidColorStroke color="#ffffff" caps="none" weight="3" joints="miter" miterLimit="4"/>
+			</s:stroke>	
+			<s:fill>
+				<s:SolidColor color="#000000"/>
+			</s:fill>
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="4" blurY="4" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 	
+		</s:Rect>
+		<s:Image right="4" top="4"  source="@Embed('/assets/close.png')" 
+				 mouseDownEffect="{blurOn}" mouseUpEffect="{blurOut}"
+				 buttonMode="true" click="OnClose();" />
+		<s:Rect left="32" right="41" top="69" height="-1">
+			<s:stroke>
+				<s:SolidColorStroke color="#dddddd" caps="none" weight="2" joints="miter" miterLimit="1"/>
+			</s:stroke>			
+		</s:Rect>
+		<s:Button id="mAdd" left="30" bottom="27" width="67" height="23" label="增加"
+				  click="OnAdd(event)" fontFamily="宋体" fontSize="16" fontStyle="normal"
+				  fontWeight="normal" skinClass="Skins.CommonButton" tabIndex="9"/>
+		<s:Button id="mUpdate" left="104" bottom="27" width="67" height="23" label="更新"
+				  click="OnUpdate(event)" fontFamily="宋体" fontSize="16" fontStyle="normal"
+				  fontWeight="normal" skinClass="Skins.CommonButton" tabIndex="10"/>
+		<s:Button id="mDelete" left="178" bottom="27" width="67" height="23" label="删除"
+				  click="OnDelete(event)" fontFamily="宋体" fontSize="16" fontStyle="normal"
+				  fontWeight="normal" skinClass="Skins.CommonButton" tabIndex="11"/>
+		
+		<s:Label id="mTitle1" left="25" top="32"  fontFamily="宋体"  fontSize="26" text="产品信息" visible="true"/>
+		<s:Button id="mEffect2" right="27" bottom="27" width="67" height="23" label="关闭"
+				  click="OnClose()" fontFamily="宋体" fontSize="16" fontStyle="normal"
+				  fontWeight="normal" skinClass="Skins.CommonButton" tabIndex="12"/>
+		
+		<s:Label left="41" top="143" text="名称：" fontFamily="宋体" fontSize="14" fontStyle="normal" fontWeight="normal"/>
+		<s:Label left="26" top="188" text="商品URL：" fontFamily="宋体" fontSize="14" fontStyle="normal" fontWeight="normal"/>
+		<s:Label left="44" top="94" text="编码：" fontFamily="宋体" fontSize="14" fontStyle="normal" fontWeight="normal"/>
+		<s:TextInput id="mTextName" left="85" top="138" width="238" height="26" fontFamily="宋体"
+					 fontSize="15" fontStyle="normal" fontWeight="normal" tabIndex="1"/>
+		<s:TextInput id="mTextCode" left="85" top="89" width="238" fontFamily="宋体" fontSize="15"
+					 fontStyle="normal" fontWeight="normal" tabIndex="2"/>
+		<s:TextInput id="mTextURL" left="85" top="183" width="238" fontFamily="宋体" fontSize="15"
+					 fontStyle="normal" fontWeight="normal" tabIndex="4"/>
+	</s:Group>		
+</s:Group>
+

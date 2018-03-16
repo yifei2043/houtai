@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   xmlns:local="*"
+			   xmlns:UI="UI.*" 
+			   width="3000" height="2000"
+			   backgroundAlpha="0.0">
+	
+	<fx:Script>
+		<![CDATA[
+           
+			public var arrayImages:Array;
+			public var serverAddr:String = "";
+			public var soapService:SoapService = null;
+			public var m_iHouse:* =null;
+			
+			public function OnInit():void
+			{
+				soapService = new SoapService(this);
+			}
+			
+			public function InitComplete():Boolean
+			{
+				return soapService.WebServiceLoaded();
+			}
+			
+			
+			public function SetPanoramicImages(images:String):Boolean
+			{
+				arrayImages = images.split(",");
+				
+				mListView.LoadImages();
+				mListView.visible = true;
+				mBtnInit.visible = false;
+				
+				return true;
+					
+			}
+			
+			protected function OnTest(event:MouseEvent):void
+			{	
+ 	/* 			var strImagesData:String =  "http://139.199.206.148/users/chenx/chenx/savefile/demo/8E17C1D7-59DA-635A-5FCC-C193917422A9.jpg,"+
+											"http://139.199.206.148/users/chenx/chenx/savefile/demo/87db104f-67f6-45d3-bc41-a3ada29b4c8d.jpg," +
+											"http://139.199.206.148/users/chenx/chenx/savefile/demo/AFD6F6BC-43F5-A511-19B6-C1809B03FACF.jpg"; 
+ */
+				
+				var strImagesData:String =  "http://127.0.0.1/001.jpg,"+
+					                         "http://127.0.0.1/002.jpg"; 
+
+				
+				
+				SetPanoramicImages(strImagesData);
+			}
+			
+			public function OnPanorInit():void
+			{
+				OnInit();
+				OnTest(null);
+			}
+			
+			public function Init(tParent:*, strData:String):void
+			{
+				m_iHouse = tParent;
+				mBtnInit.visible = false;
+				
+				OnInit();
+				SetPanoramicImages(strData);
+			}
+			
+			public function OnClose():void
+			{
+				if( m_iHouse )
+					m_iHouse.dispatchEvent(new Event("Panoramic_Close",true));
+			}			
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>	
+	<local:ListView  id="mListView" m_iHousePanoramic="{this}" left="{(this.width-mListView.width)/2}"    top="{(this.height-mListView.height)/2}" visible="false"/>
+	<local:RelevanceImage  id="mRelevanceImage" m_iHousePanoramic="{this}" left="{(this.width-mRelevanceImage.width)/2}" top="{(this.height-mRelevanceImage.height)/2}"  visible="false"/>
+	<s:Button id="mBtnInit" x="654" y="10" label="初始化" click="OnPanorInit()"/>
+	<UI:AlertDialog id="mAlertDialog"  horizontalCenter="0" verticalCenter="0" visible="false"  />
+</s:Application>
