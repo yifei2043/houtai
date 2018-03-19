@@ -100,6 +100,7 @@
 			{
 				this.m_Title.text="修改用户窗口";
 				mUserName.enabled = false;
+				mCombo.enabled = false;
 				mModifyPWD.visible = true;
 				mModifyPWD.selected= false;
 				this.psw1.enabled = false;
