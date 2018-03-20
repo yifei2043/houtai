@@ -67,6 +67,8 @@
 
 				mType.selectedIndex = 0;
 				m_iType = 0;
+				mJCS.selectedIndex = 0;
+				m_iJCS = 0;
 				
 				//放置类型 通用:0  地面：1  墙面：2  顶面：3
 				PutTypeGroup.addItem({label:"通用"});
@@ -193,6 +195,17 @@
 				
 				mType.selectedIndex = int(strRecordArray[5]); 	// 类型
 				m_iType = int(strRecordArray[5]);
+				
+				// 供货商
+				mJCS.selectedIndex = 0;
+				for (var i:int=0; i < RecordGroup.length; i++)
+				{
+					if (RecordGroup[i]['id'] == int(strRecordArray[13]))
+					{
+						mJCS.selectedIndex = i+1;
+						break;
+					}
+				}
 				
 				//放置类型
 				if(strRecordArray.length > 15)
@@ -775,7 +788,7 @@
 			
 			public function OnChangeRecord(list:ArrayCollection, key:String):void
 			{
-				m_iJCS = list[mJCS.selectedIndex][key];
+				m_iJCS = list[mJCS.selectedIndex-1][key];
 			}
 			
 			
@@ -1024,6 +1037,8 @@
 			{
 				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnErrorJcs);
 				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResultJcs);
+				
+				RecordGroup.addItem({id:"-1", lable:"无"});
 				
 				var str:String = e.result.toString();
 				var strArray:Array = str.split("#");

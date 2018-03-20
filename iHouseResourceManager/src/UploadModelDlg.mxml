@@ -70,6 +70,8 @@
 				TypeGroup.addItem({label:"顶面"});
 				mType.selectedIndex = 0;
 				m_iType = 0;
+				mJCS.selectedIndex = 0;
+				m_iJCS = 0;
 			}
 			
 			public function HidePriceText():void
@@ -178,6 +180,17 @@
 				mPrice.text  = strRecordArray[10];
 				mType.selectedIndex = int(strRecordArray[6]); 	// 类型
 				m_iType = int(strRecordArray[6]);
+				
+				// 供货商
+				mJCS.selectedIndex = 0;
+				for (var i:int=0; i < RecordGroup.length; i++)
+				{
+					if (RecordGroup[i]['id'] == int(strRecordArray[14]))
+					{
+						mJCS.selectedIndex = i+1;
+						break;
+					}
+				}
 				
 				if(strRecordArray.length > 17)
 					mModelName.text = strRecordArray[16];
@@ -1301,7 +1314,7 @@
 						
 			public function OnChangeRecord(list:ArrayCollection, key:String):void
 			{
-				m_iJCS = list[mJCS.selectedIndex][key];
+				m_iJCS = list[mJCS.selectedIndex-1][key];
 			}
 
 			public function OnChange(event:ListEvent):void			
@@ -1535,6 +1548,8 @@
 			{
 				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnErrorJcs);
 				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResultJcs);
+				
+				RecordGroup.addItem({id:"-1", lable:"无"});
 				
 				var str:String = e.result.toString();
 				var strArray:Array = str.split("#");
