@@ -48,6 +48,9 @@
 			{
 				mModelDialog.m_iHouse = m_iHouse;
 				mModelDialog.init();
+				
+				m_iHouse.mUploadFileDlg.GetJcsUserList();
+				
 				mEditDlg.m_iHouse		 = m_iHouse;
 				mModifyClassDlg.m_iHouse = m_iHouse;
 				mUpdateModelDlg.m_iHouse = m_iHouse;

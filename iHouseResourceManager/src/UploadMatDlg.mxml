@@ -41,6 +41,7 @@
 			private var m_strFile:String;   
 			private var m_iType:int = 0;		//反射类型 普通：0  高光：1  平光：2  哑光：3
 			private var m_iPutType:int = 0;    //放置类型 通用:0  地面：1  墙面：2  顶面：3
+			private var m_iJCS:int = 0;		//建材商选择
 			
 			private var m_iMode:int = 0; 		// 0 3D   1 vrscene  2 缩略图
 			private var m_strUUID:String;
@@ -48,6 +49,9 @@
 			//如果有重新上传文件情况，需要更新uuid.为了更新后的数据能正常在渲染端下载
 			private var mUploadFile:Boolean = false;
 			private var mDeleteFile:Boolean = false;
+						
+			[Bindable]
+			public var RecordGroup:ArrayCollection   =new ArrayCollection();
 			
 			private function init():void
 			{
@@ -768,6 +772,13 @@
 				m_iType = mType.selectedIndex;
 			}
 			
+			
+			public function OnChangeRecord(list:ArrayCollection, key:String):void
+			{
+				m_iJCS = list[mJCS.selectedIndex][key];
+			}
+			
+			
 			public function OnPutChangeType(e:IndexChangeEvent):void
 			{
 				m_iPutType = mPutType.selectedIndex;
@@ -989,6 +1000,47 @@
 			{
 				visible = false;
 			}
+						
+			/***
+			 * 得到建材商列表
+			 * 
+			 */
+			public function GetJcsUserList():void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("GetJcsUserList");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnErrorJcs);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnResultJcs);
+				op.send(m_iHouse.mStrCompanyID); 
+			}
+			
+			private function OnErrorJcs(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnErrorJcs);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResultJcs);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试.");	 
+			}			
+			
+			public function OnResultJcs(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnErrorJcs);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResultJcs);
+				
+				var str:String = e.result.toString();
+				var strArray:Array = str.split("#");
+				
+				for( var i:int = 0;i<strArray.length; i++ )  
+				{
+					var strRecord:String = strArray[i];
+					var strRecordArray:Array = strRecord.split("~");
+					
+					if( strRecordArray[0] == "1" )
+						continue;
+					
+					RecordGroup.addItem({id:strRecordArray[1], 
+						lable:strRecordArray[0]
+					});
+				}
+			}
 			
 		]]>
 	</fx:Script>	
@@ -1098,6 +1150,12 @@
 				</mx:Tree>	
 			</mx:popUp>
 		</mx:PopUpButton>
+				
+		<s:Label x="33" bottom="69" fontFamily="宋体" fontSize="14" text="选择建材商:"/>
+		<s:DropDownList id="mJCS" x="123" bottom="65" width="111" height="23" labelField="lable"
+						change="OnChangeRecord(RecordGroup, 'id')" dataProvider="{RecordGroup}" fontFamily="宋体"
+						fontSize="15" tabIndex="7"/>
+		
 		<s:Button x="315" y="528" width="120" height="26" label="确定" skinClass="Skins.CommonButton" click="OnOK();"/>
 		<s:Button x="345" y="40" width="60" height="22" label="测试唯一" skinClass="Skins.CommonButton" click="CheckName();" visible="false"/>
 	</s:Group>	

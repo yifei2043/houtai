@@ -2,7 +2,7 @@
 <s:Group xmlns:s="library://ns.adobe.com/flex/spark"
 		 xmlns:fx="http://ns.adobe.com/mxml/2009"
 		 xmlns:mx="library://ns.adobe.com/flex/mx"
-		 width="750" height="580" creationComplete="init()">
+		 width="750" height="620" creationComplete="init()">
 	
 	<fx:Script>
 		<![CDATA[	
@@ -46,6 +46,7 @@
 			private var m_strFile:String;
 			private var m_iType:int = 0;		// 0 地面 1 墙面 2 顶面
 			private var m_strUUID:String; 	
+			private var m_iJCS:int = 0;		//建材商选择
 			
 			private var vrsceneFileName:String;
 			private var vrSceneFileNameTemp:String;
@@ -55,12 +56,15 @@
 			private var m3DSPathFileName:String = "";
 			private var mUpload3DFile:Boolean = true; //上传是的3d文件还是vrscene文件
 			
+			[Bindable]
+			public var RecordGroup:ArrayCollection   =new ArrayCollection();
+			
 			private function init():void
 			{
 				fileRefs.addEventListener(Event.SELECT,fileSelectHandler);
 				fileRefs.addEventListener(IOErrorEvent.IO_ERROR,ioErrorHandler);
 				fileRefs.addEventListener(Event.COMPLETE, completeHandler); 
-				
+								
 				TypeGroup.addItem({label:"地面"});
 				TypeGroup.addItem({label:"墙面"});
 				TypeGroup.addItem({label:"顶面"});
@@ -1294,6 +1298,11 @@
 			{
 				m_iType = mType.selectedIndex;
 			}
+						
+			public function OnChangeRecord(list:ArrayCollection, key:String):void
+			{
+				m_iJCS = list[mJCS.selectedIndex][key];
+			}
 
 			public function OnChange(event:ListEvent):void			
 			{
@@ -1503,6 +1512,47 @@
 				this.visible = false;
 			}
 			
+			/***
+			 * 得到建材商列表
+			 * 
+			 */
+			public function GetJcsUserList():void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("GetJcsUserList");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnErrorJcs);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnResultJcs);
+				op.send(m_iHouse.mStrCompanyID); 
+			}
+			
+			private function OnErrorJcs(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnErrorJcs);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResultJcs);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试.");	 
+			}			
+			
+			public function OnResultJcs(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnErrorJcs);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResultJcs);
+				
+				var str:String = e.result.toString();
+				var strArray:Array = str.split("#");
+				
+				for( var i:int = 0;i<strArray.length; i++ )  
+				{
+					var strRecord:String = strArray[i];
+					var strRecordArray:Array = strRecord.split("~");
+					
+					if( strRecordArray[0] == "1" )
+						continue;
+					
+					RecordGroup.addItem({id:strRecordArray[1], 
+						lable:strRecordArray[0]
+					});
+				}
+			}
+			
 		]]>
 	</fx:Script>	
 	<fx:Declarations>
@@ -1558,7 +1608,7 @@
 				 mouseDownEffect="{blurOn}" mouseUpEffect="{blurOut}"
 				 buttonMode="true" click="OnClose();" />		
 
-		<s:Button x="580" bottom="48" width="110" height="23" id="selectFileButton" label="上传本地文件" 
+		<s:Button x="580" bottom="88" width="110" height="23" id="selectFileButton" label="上传本地文件" 
 				  click="selectFile()" skinClass="Skins.CommonButton" fontFamily="宋体"/>
 		<s:Label x="418" y="104" fontFamily="宋体" fontSize="14" text="长:"/>
 		<s:Label x="483" y="104" fontFamily="宋体" fontSize="14" text="宽:"/>
@@ -1594,10 +1644,10 @@
 					   fontSize="15" fontStyle="normal" fontWeight="normal" skinClass="Skins.CommonRadioButton"/>	
 		
 		<s:List id="mList3D" dataProvider="{RenderGroup}" itemRenderer="Skins.BudgetRenderer" 
-				click="OnList3D(event);" left="25" top="209" right="35"  bottom="94" verticalScrollPolicy="on" />	
+				click="OnList3D(event);" left="25" top="209" right="35"  bottom="134" verticalScrollPolicy="on" />	
 	
 		<s:List id="mListVR" dataProvider="{VRGroup}" itemRenderer="Skins.VRRenderer" visible="false"
-				click="" left="25" top="209" right="35"  bottom="94" verticalScrollPolicy="on" />	
+				click="" left="25" top="209" right="35"  bottom="134" verticalScrollPolicy="on" />	
 		
 		<s:Image id="mIcon" x="614" y="91" width="100" height="100"  doubleClickEnabled="true" doubleClick="OnShowImage()"/>	
 		<mx:PopUpButton id="mClass" x="69" y="138" width="342" height="23" label="选择分类..."
@@ -1609,7 +1659,13 @@
 				</mx:Tree>	
 			</mx:popUp>
 		</mx:PopUpButton>
-		<s:Button x="307" y="538" width="120" height="26" label="确定" skinClass="Skins.CommonButton" click="OnOK();"/>
+		
+		<s:Label x="33" y="542" fontFamily="宋体" fontSize="14" text="选择建材商:"/>
+		<s:DropDownList id="mJCS" x="123" y="538" width="111" height="23" labelField="lable"
+						change="OnChangeRecord(RecordGroup, 'id')" dataProvider="{RecordGroup}" fontFamily="宋体"
+						fontSize="15" tabIndex="7"/>
+		
+		<s:Button x="307" y="568" width="120" height="26" label="确定" skinClass="Skins.CommonButton" click="OnOK();"/>
 		<s:Button x="327" y="36" width="60" height="22" label="测试唯一" skinClass="Skins.CommonButton" click="CheckName();" visible="false"/>
 		<s:TextInput id="mPathText" x="147" y="15" width="498" editable="false" tabIndex="8" visible="false"/>
 		<s:Group id="mGroupAttribute" left="25" top="209" right="35"  bottom="94">
