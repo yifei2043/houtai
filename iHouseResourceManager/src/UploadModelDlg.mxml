@@ -1193,7 +1193,7 @@
 					m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnModifyModelResult);
 					m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnModifyModelFault);	
 					op.send(m_strName,m_strSize,arrayClass[0],arrayClass[1],arrayClass[2],
-						    m_iType,Number(mPrice.text), m_strUUID,mTextAttribute.text,mModelName.text,strNewUUID);
+						    m_iType,Number(mPrice.text), m_strUUID,mTextAttribute.text,mModelName.text,strNewUUID,m_iJCS);
 					
 					OnClearData();
 				}
