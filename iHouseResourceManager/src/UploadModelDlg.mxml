@@ -185,7 +185,7 @@
 				mJCS.selectedIndex = 0;
 				for (var i:int=0; i < RecordGroup.length; i++)
 				{
-					if (RecordGroup[i]['id'] == int(strRecordArray[14]))
+					if (RecordGroup[i]['id'] == int(strRecordArray[17]))
 					{
 						mJCS.selectedIndex = i+1;
 						break;
