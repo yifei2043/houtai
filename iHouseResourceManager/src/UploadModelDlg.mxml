@@ -187,7 +187,7 @@
 				{
 					if (RecordGroup[i]['id'] == int(strRecordArray[17]))
 					{
-						mJCS.selectedIndex = i+1;
+						mJCS.selectedIndex = i;
 						break;
 					}
 				}
@@ -1314,7 +1314,7 @@
 						
 			public function OnChangeRecord(list:ArrayCollection, key:String):void
 			{
-				m_iJCS = list[mJCS.selectedIndex-1][key];
+				m_iJCS = list[mJCS.selectedIndex][key];
 			}
 
 			public function OnChange(event:ListEvent):void			
