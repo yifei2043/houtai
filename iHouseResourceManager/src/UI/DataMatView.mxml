@@ -860,8 +860,8 @@
 	<local:UploadMatDlg id="mUploadFileDlg" x="{(this.width-mUploadFileDlg.width)/2}" y="{(this.height-mUploadFileDlg.height)/2-48}" visible="false"  />
 	<UI:EditDlg id="mEditDlg"  visible="false"  />
 	<UI:ModifyClassDlg id="mModifyClassDlg"  visible="false"  />
-	<s:Button left="1" top="1" width="104" height="44" click="ShowModelView();" label="模型库" skinClass="Skins.CommonButton" fontFamily="宋体"/>
-	<s:Button left="106" top="1" width="91" height="44" enabled="false" label="材料库" skinClass="Skins.CommonButton" fontFamily="宋体"/>
+	<s:Button left="1" top="1" width="104" height="44" click="ShowModelView();" label="模型库" skinClass="Skins.CommonTabButton" fontFamily="宋体"/>
+	<s:Button left="106" top="1" width="91" height="44" enabled="false" label="材料库" skinClass="Skins.CommonTabButton" fontFamily="宋体"/>
 	<UI:UpdateMatDlg id="mUpdateMatDlg" x="{(this.width-mUpdateMatDlg.width)/2}" y="{(this.height-mUpdateMatDlg.height)/2-48}" visible="false"  />
 
 </s:Group>

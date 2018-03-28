@@ -985,9 +985,9 @@
 -->	<UI:EditDlg id="mEditDlg"  visible="false"  />
 	<UI:ModifyClassDlg id="mModifyClassDlg"  visible="false"  />
 	<s:Button left="1" top="1" width="104" height="44" label="模型库" enabled="false" fontFamily="宋体"
-			  skinClass="Skins.CommonButton"/>
+			  skinClass="Skins.CommonTabButton"/>
 	<s:Button left="106" top="1" width="91" height="44" label="材料库" click="ShowMaterialView();"
-			  fontFamily="宋体" skinClass="Skins.CommonButton"/>
+			  fontFamily="宋体" skinClass="Skins.CommonTabButton"/>
 	<UI:UpdateModelDlg id="mUpdateModelDlg" x="{(this.width-mUpdateModelDlg.width)/2}" y="{(this.height-mUpdateModelDlg.height)/2-48}" visible="false"  />
 
 	<s:SWFLoader id="swfLoader" left="5" top ="45" right="5" bottom="5" visible="false"/>	
