@@ -187,6 +187,7 @@
 				{
 					if (RecordGroup[i]['id'] == int(strRecordArray[17]))
 					{
+						m_iJCS = RecordGroup[i]['id'];
 						mJCS.selectedIndex = i;
 						break;
 					}
@@ -1630,16 +1631,12 @@
 		<s:Label x="547" y="104" fontFamily="宋体" fontSize="14" text="高:"/>
 		<s:Label x="22"  y="104" fontFamily="宋体" fontSize="14" text="名称(只英文和数字)"/>
 		<s:Label x="61"  y="19" fontFamily="宋体" fontSize="14" text="保存的路径:" visible="false"/>
-		<s:Label id="mPriceText" x="295" y="44" fontFamily="宋体" fontSize="14" text="价 格:" visible="false"/>
-		<s:Label id="mPriceUnit" x="454" y="43" fontFamily="宋体" fontSize="14" text="元" visible="false"/>
 		<s:Label x="33"  y="510" fontFamily="宋体" fontSize="14" text="当前记录数:" id="mNumber"/>
 		<s:TextInput id="mName" x="147" y="100" width="110" change="OnNameChange(event)" fontFamily="宋体"
 					 fontSize="15"  tabIndex="1"/>
 		<s:Label x="263"  y="104" fontFamily="宋体" fontSize="14" text="中文名称:"/>
 		<s:TextInput id="mModelName" x="327" y="100" width="84"  fontFamily="宋体"
 					 fontSize="15"  tabIndex="2"/>
-		<s:TextInput id="mPrice" x="346" y="38" width="100" fontFamily="宋体" fontSize="15"
-					 restrict="0-9." visible="false"/>
 		<s:TextInput id="mLength" x="440" y="100" width="40" height="25" fontFamily="宋体"
 					 fontSize="15" restrict="0-9" tabIndex="3"/>
 		<s:TextInput id="mWidth" x="505" y="100" width="40" height="25" fontFamily="宋体" fontSize="15"
@@ -1680,7 +1677,12 @@
 						change="OnChangeRecord(RecordGroup, 'id')" dataProvider="{RecordGroup}" fontFamily="宋体"
 						fontSize="15" tabIndex="7"/>
 		
-		<s:Button x="307" y="568" width="120" height="26" label="确定" skinClass="Skins.CommonButton" click="OnOK();"/>
+		<s:Label id="mPriceText" x="255" y="542" fontFamily="宋体" fontSize="14" text="价 格:" visible="true"/>
+		<s:Label id="mPriceUnit" x="414" y="542" fontFamily="宋体" fontSize="14" text="元" visible="true"/>
+		<s:TextInput id="mPrice" x="306" y="538" width="100" fontFamily="宋体" fontSize="15"
+					 restrict="0-9." visible="true"/>
+		
+		<s:Button x="307" y="578" width="120" height="26" label="确定" skinClass="Skins.CommonButton" click="OnOK();"/>
 		<s:Button x="327" y="36" width="60" height="22" label="测试唯一" skinClass="Skins.CommonButton" click="CheckName();" visible="false"/>
 		<s:TextInput id="mPathText" x="147" y="15" width="498" editable="false" tabIndex="8" visible="false"/>
 		<s:Group id="mGroupAttribute" left="25" top="209" right="35"  bottom="94">

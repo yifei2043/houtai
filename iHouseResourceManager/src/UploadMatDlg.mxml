@@ -202,6 +202,7 @@
 				{
 					if (RecordGroup[i]['id'] == int(strRecordArray[16]))
 					{
+						m_iJCS = RecordGroup[i]['id'];
 						mJCS.selectedIndex = i;
 						break;
 					}
@@ -1100,10 +1101,6 @@
 					   fontSize="15" fontStyle="normal" fontWeight="normal" skinClass="Skins.CommonRadioButton"/>
 		<s:Label x="65"  y="19" fontFamily="宋体" fontSize="14" text="保存的路径:" visible="false"/>
 		<s:TextInput id="mPathText" x="151" y="17" width="498" editable="false" tabIndex="7" visible="false"/>
-		<s:Label id="mPriceText" x="422" y="42" fontFamily="宋体" fontSize="14" text="价 格:" visible="false"/>
-		<s:Label id="mPriceUnit" x="575" y="42" fontFamily="宋体" fontSize="14" text="元" visible="false"/>
-		<s:TextInput id="mPrice" x="468" y="36" width="100" fontFamily="宋体" fontSize="15"
-					 restrict="0-9." visible="false"/>
 		
 		<s:Label x="294" y="140" fontFamily="宋体" fontSize="14" text="渲染效果:"/>
 		<s:DropDownList id="mType" x="358" y="136" width="90" height="23"
@@ -1171,7 +1168,12 @@
 						change="OnChangeRecord(RecordGroup, 'id')" dataProvider="{RecordGroup}" fontFamily="宋体"
 						fontSize="15" tabIndex="7"/>
 		
-		<s:Button x="315" y="528" width="120" height="26" label="确定" skinClass="Skins.CommonButton" click="OnOK();"/>
+		<s:Label id="mPriceText" x="255" bottom="69" fontFamily="宋体" fontSize="14" text="价 格:" visible="true"/>
+		<s:Label id="mPriceUnit" x="414" bottom="69" fontFamily="宋体" fontSize="14" text="元" visible="true"/>
+		<s:TextInput id="mPrice" x="306" bottom="65" width="100" fontFamily="宋体" fontSize="15"
+					 restrict="0-9." visible="true"/>
+		
+		<s:Button x="315" y="534" width="120" height="26" label="确定" skinClass="Skins.CommonButton" click="OnOK();"/>
 		<s:Button x="345" y="40" width="60" height="22" label="测试唯一" skinClass="Skins.CommonButton" click="CheckName();" visible="false"/>
 	</s:Group>	
 </s:Group>
