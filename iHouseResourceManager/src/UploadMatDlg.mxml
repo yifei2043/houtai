@@ -1039,7 +1039,7 @@
 				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnErrorJcs);
 				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResultJcs);
 				
-				RecordGroup.addItem({id:"-1", lable:"无"});
+				RecordGroup.addItem({id:"-1", lable:"不限"});
 				
 				var str:String = e.result.toString();
 				var strArray:Array = str.split("#");

@@ -33,6 +33,9 @@
 			
 			public var node1Name:String= "";
 			public var node2Name:String= "";
+			
+			[Bindable]
+			public var RecordGroup:ArrayCollection   =new ArrayCollection();
 
 			public function init() : void
 			{
@@ -50,6 +53,7 @@
 				menuTree.addEventListener(MenuEvent.ITEM_CLICK, tree_MenuItemSelected);  //右键菜单的事件
 				mFurniture.addEventListener(MouseEvent.RIGHT_CLICK,treeRightClick);
 				mFurniture.addEventListener(MouseEvent.CLICK,treeClick);			
+				
 			}
 			
 			//树右击事件
@@ -463,6 +467,7 @@
 			 */
 			private var m_strClass1:String;
 			private var m_strClass2:String;
+			private var m_iJCS:int = 0;		//建材商选择
 			public function DoSql(str1:String,str2:String):void
 			{
 				m_strClass1 = str1;
@@ -475,6 +480,24 @@
 				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnErrorSql);
 				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnResultSql);
 				op.send(strSql,'6E897B0F-1440-7196-96C1-05C879E9399A',m_iHouse.mStrUserID,m_iHouse.mStrAccountType);			
+			}
+			public function DoSqlKey(str0:String):void
+			{
+				var strTemp:String = "select * from material where (name like '%{0}%' or materialname like '%{1}%')";
+				var strSql:String =  mx.utils.StringUtil.substitute(strTemp,str0,str0);
+				if(m_iJCS>0){
+					strSql += " and UserJcsID = '" + m_iJCS + "'";
+				}
+				
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("DoSql");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnErrorSql);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnResultSql);
+				op.send(strSql,'6E897B0F-1440-7196-96C1-05C879E9399A',m_iHouse.mStrUserID,m_iHouse.mStrAccountType);			
+			}
+						
+			public function OnChangeRecord(list:ArrayCollection, key:String):void
+			{
+				m_iJCS = list[mJCS.selectedIndex][key];
 			}
 			
 			private function OnErrorSql(e:FaultEvent):void
@@ -814,7 +837,7 @@
 			//	UploadFile.visible   = ("1" == m_iHouse.mStrAdministrator)  ? true : false;			
 				Add.visible          = ("1" == m_iHouse.mStrAdministrator)  ? true : false;
 			}
-				
+							
 		]]>
 	</fx:Script>
 	
@@ -856,6 +879,20 @@
 		<mx:NumericStepper id="inputpage" x="280" y="0" width="60" height="25" maximum="0" minimum="0" color="#000000" stepSize="1"/>          
 		<mx:LinkButton x="350" y="0" width="60" label="跳转" click="setPager(inputpage.value - 1);"/>  
 	</s:Group>
+	
+	<s:Group id="mGroup3" left="750" bottom="9" width="480" color="#FFFFFF" fontFamily="宋体"
+			 fontSize="16">
+		<s:Label x="0" y="15" fontFamily="宋体" fontSize="14" text="关键字:"/>
+		<s:TextInput id="SelKey" x="60" y="10" width="150"  fontFamily="宋体" color="#000000"
+					 fontSize="15"  />
+		<s:Label x="220" y="15" fontFamily="宋体" fontSize="14" text="建材商:"/>
+		<s:DropDownList id="mJCS" x="280" y="10" width="110" height="23" labelField="lable" color="#000000"
+						change="OnChangeRecord(mUploadFileDlg.RecordGroup, 'id')" dataProvider="{mUploadFileDlg.RecordGroup}" fontFamily="宋体"
+						fontSize="15" tabIndex="7"/>
+		<s:Button id="Sel" x="400" y="0" width="80" label="筛选" buttonMode="true"
+				  click="DoSqlKey(SelKey.text);" skinClass="Skins.NormalCreateBtnSkin"/>	
+	</s:Group>
+	
 	<mx:Label id="pagedetail" left="30" bottom="15" color="#FFFFFF" fontFamily="宋体" fontSize="16" text="第 0 页/共 0 页"/>	
 	<local:UploadMatDlg id="mUploadFileDlg" x="{(this.width-mUploadFileDlg.width)/2}" y="{(this.height-mUploadFileDlg.height)/2-48}" visible="false"  />
 	<UI:EditDlg id="mEditDlg"  visible="false"  />
