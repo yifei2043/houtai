@@ -765,8 +765,8 @@
 				mIcon.source  = null;
 				this.visible = false;	
 				
-				//界面刷新
-				m_iHouse.mDataMatView.OnChange(null);
+				//界面刷新 20180403暂时屏蔽
+				//m_iHouse.mDataMatView.OnChange(null);
 			}
 
 			private function OnList3D(evt:MouseEvent):void

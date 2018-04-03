@@ -385,7 +385,7 @@
 			public var curPage:int; 		// 当前页码
 			public var totalPage:int;  	// 总页数 
 			public var totalCount:int; 	// 总记录条数 
-			public var pageCount:int = 20;	// 每页包含的记录数，默认6条 
+			public var pageCount:int = 32;	// 每页包含的记录数，默认20条 
 			private var mypagedata:ArrayCollection = new ArrayCollection();
 			public function setPager(value:int):void              
 			{                  
@@ -526,9 +526,8 @@
 					return;
 				
 				var recordArray:Array = m_strData.split("#");
-				if( recordArray.length <=1 )
-					return;
-				
+//				if( recordArray.length <=1 )
+//					return; //检索条数为0时，下方记录数刷新
 
 				m_strFloder =m_iHouse.mDataProcess.webserviceAddr+"ihouse/data/texture/";
 				for( var i:int = recordArray.length-1;i>=0; i-- )				
@@ -867,11 +866,11 @@
 <!--	<s:Button id="UploadFile" right="310" bottom="10" width="120" label="生成使用库" buttonMode="true"
 			  click="ExportMat();" skinClass="Skins.NormalCreateBtnSkin"/>-->
 	
-	<s:Button id="Add" right="170" bottom="10" width="120" label="新增加" buttonMode="true"
+	<s:Button id="Add" right="10" bottom="10" width="120" label="新增加" buttonMode="true"
 			  click="OnUploadFile();" skinClass="Skins.NormalCreateBtnSkin"/>	
 	
 	
-	<s:Group id="mGroup2" left="300" bottom="13" width="410" color="#FFFFFF" fontFamily="宋体" fontSize="16">
+	<s:Group id="mGroup2" left="240" bottom="13" width="410" color="#FFFFFF" fontFamily="宋体" fontSize="16">
 		<mx:LinkButton x="0"  y="0" width="60" label="首页" click="setPager(0);"/>
 		<mx:LinkButton x="70" y="0" width="60" label="上页" click="setPager(curPage - 1);"/>         
 		<mx:LinkButton x="140" y="0" width="60" label="下页" click="setPager(curPage + 1);" textAlign="left"/>         
@@ -880,7 +879,7 @@
 		<mx:LinkButton x="350" y="0" width="60" label="跳转" click="setPager(inputpage.value - 1);"/>  
 	</s:Group>
 	
-	<s:Group id="mGroup3" left="750" bottom="9" width="480" color="#FFFFFF" fontFamily="宋体"
+	<s:Group id="mGroup3" left="690" bottom="9" width="480" color="#FFFFFF" fontFamily="宋体"
 			 fontSize="16">
 		<s:Label x="0" y="15" fontFamily="宋体" fontSize="14" text="关键字:"/>
 		<s:TextInput id="SelKey" x="60" y="10" width="150"  fontFamily="宋体" color="#000000"
