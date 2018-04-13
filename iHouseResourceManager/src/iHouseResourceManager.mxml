@@ -11,6 +11,7 @@
 			import mx.events.FlexEvent;
 			import mx.managers.SystemManager;
 			
+			public var mXMLDataProcess:XMLDataProcess = null;
 			public var mDataProcess:ResourceDataProcess = null;
 			
 			//用户ID，默认为帐号为zhouqj的id作测试
@@ -34,8 +35,15 @@
 			
 			public function Init():void
 			{				
+				mXMLDataProcess = new XMLDataProcess(this);
 				mDataProcess = new ResourceDataProcess(this);					
 				SetWindowPosition(1,1,1,1);
+			}
+			
+			//xml读取成功后调用此函数,创建按钮
+			public function InitQueryDialog():void
+			{
+				mUploadFileDlg.InitDialog();
 			}
 			
 			public function SetLoginInfo(strUserID:String,StrAdministrator:String,

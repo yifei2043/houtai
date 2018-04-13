@@ -42,6 +42,7 @@
 				mUploadFileDlg.m_iHouse  = m_iHouse;
 				
 				mUploadFileDlg.GetJcsUserList();
+				mUploadFileDlg.InitDialog();
 				
 				mEditDlg.m_iHouse		 = m_iHouse;
 				mModifyClassDlg.m_iHouse = m_iHouse;
@@ -55,6 +56,12 @@
 				mFurniture.addEventListener(MouseEvent.CLICK,treeClick);			
 				
 			}
+			
+//			//xml读取成功后调用此函数,创建按钮
+//			public function InitQueryDialog():void
+//			{
+//				mUploadFileDlg.InitDialog();
+//			}
 			
 			//树右击事件
 			private function treeRightClick(e:MouseEvent):void

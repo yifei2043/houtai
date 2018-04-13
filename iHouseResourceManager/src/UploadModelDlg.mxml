@@ -58,6 +58,7 @@
 			
 			[Bindable]
 			public var RecordGroup:ArrayCollection   =new ArrayCollection();
+			public var mypagedata:ArrayCollection = new ArrayCollection();
 			
 			private function init():void
 			{
@@ -72,6 +73,13 @@
 				m_iType = 0;
 				mJCS.selectedIndex = 0;
 				m_iJCS = 0;
+			}
+			
+			public function InitDialog():void
+			{
+				mypagedata.addItem({mParent:this});
+				
+				mList.dataProvider = mypagedata;
 			}
 			
 			public function HidePriceText():void
@@ -1686,7 +1694,11 @@
 		<s:Button x="327" y="36" width="60" height="22" label="测试唯一" skinClass="Skins.CommonButton" click="CheckName();" visible="false"/>
 		<s:TextInput id="mPathText" x="147" y="15" width="498" editable="false" tabIndex="8" visible="false"/>
 		<s:Group id="mGroupAttribute" left="25" top="209" right="35"  bottom="94">
-			<s:TextArea id="mTextAttribute" left="1" top="5" right="5" bottom="44"  fontFamily="宋体" fontSize="14" restrict="^,#~" tabIndex="9"/>
+			<s:TextArea id="mTextAttribute" left="1" top="5" right="5" bottom="160"  fontFamily="宋体" fontSize="14" restrict="^,#~" tabIndex="9"/>
+			<s:List id="mList" left="5" top="160" right="5"  bottom="40"  borderVisible="false"
+					contentBackgroundColor="#F7F7F7"  
+					itemRenderer="Skins.ListItemRender" verticalScrollPolicy="on" horizontalScrollPolicy="off">		
+			</s:List>
 			<s:Label id="mLabelAttribute" left="5" bottom="5" right="20" color="#ff0000"  fontFamily="宋体" fontSize="14"
 					 text="说明：输入属性内容，例如一个空调模型有品牌、颜色、规格、尺寸,则输入以下内容：格力白色柜式200X300X1000,这里可以根据模型信息输入任意与模型相关信息，主要目的方便前端查找。"/>
 		</s:Group>

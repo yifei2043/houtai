@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:local="*"
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  width="660" height="105" creationComplete="OnInit()">
+	<fx:Script>
+		<![CDATA[
+			
+			import Skins.ListItemRender;
+			import Skins.ListItemButton;
+			
+			import com.adobe.serialization.json.*;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Button;
+			import mx.rpc.AbstractOperation;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.soap.WebService;
+			
+			import spark.components.RadioButton;
+			
+			public  var m_iHouse:iHouseResourceManager;
+			
+			public var m_btnWidth:Number = 40;
+			public var m_btnHeight:Number = 20;
+			public var m_btnSpace:Number = 5;
+			public var m_btnTopSpace:Number = 1;  //按钮与标签顶部距离  10
+			public var m_btnLeftSpace:Number = 8;  //按钮与标签左侧距离 
+			public var m_btnLineCount:Number = 5;  //每行5个按钮
+			public var m_btnFontWidth:Number = 10; //一个字字占用宽度 
+			
+//			public var mWebService:WebService = null;
+			
+			public function OnInit():void
+			{
+				//data.mParent;
+
+				m_iHouse = data.mParent.m_iHouse
+				InitDialog();
+			}
+			
+			public function InitDialog():void
+			{
+//				mWebService = m_iHouse.m_parentSWF.m_iHouse.t.m_RenderCenter;
+				
+				//创建颜色按钮
+				CreateButton(mLabelColor.left.valueOf() + mLabelColor.width + m_btnLeftSpace,
+							 mLabelColor.top.valueOf() + m_btnTopSpace,
+							 m_iHouse.mXMLDataProcess.m_colorArray,
+							 "color");
+				
+				//创建类型按钮
+				CreateButton(mLabelStyle.left.valueOf() + mLabelStyle.width + m_btnLeftSpace,
+							 mLabelStyle.top.valueOf() + m_btnTopSpace,
+							 m_iHouse.mXMLDataProcess.m_styleArray,
+							 "style");
+				
+				//创建品牌按钮
+				/* 				
+				CreateButton(mLabelBrand.left.valueOf(),
+				mLabelBrand.top.valueOf() + mLabelBrand.height + m_btnTopSpace,
+				m_iHouse.mXMLDataProcess.m_brandArray,
+				"brand"); 
+				*/
+				
+				OnGetBrands();
+			}
+			
+			public function CreateButton(left:int,top:int,buttonArray:ArrayCollection,strFlag:String):void
+			{
+				var leftPos:int = left;
+				var topPos:int  = top;
+				
+				for(var iIndex:int = 0; iIndex < buttonArray.length;++iIndex)				
+				{
+					var buttonData:Object = buttonArray[iIndex];
+					
+					var btn:RadioButton = new RadioButton();
+					btn.setStyle("skinClass",Skins.ListItemButton);
+					
+					//按钮显示文本
+					btn.label = buttonData.name;
+					btn.groupName = strFlag;
+					btn.alpha = 1;
+					
+					var byteButtonText:ByteArray = new ByteArray();  
+					byteButtonText.writeMultiByte(btn.label,"gbk");  
+					
+					var btnWidth:int = byteButtonText.length * m_btnFontWidth; 
+					
+					byteButtonText = null;
+					
+					if( (leftPos + btnWidth) > (this.width - left) )
+					{
+						leftPos = left;
+						topPos += m_btnHeight + 5;
+					}
+					
+					btn.left   = leftPos;
+					btn.top    = topPos;
+					btn.width  = btnWidth;
+					btn.height = m_btnHeight;
+					
+					btn.addEventListener(MouseEvent.CLICK,OnButtonClick); 
+					this.addElement(btn); 
+					
+					leftPos += btnWidth + m_btnSpace;
+				} 
+			}
+			
+			private function OnButtonClick(event:Event):void 
+			{ 
+				var button:RadioButton = event.target as RadioButton;
+				
+				var strText:String = button.label;
+				
+				data.mParent.mTextAttribute.text += " " + strText;
+			} 
+			
+			//创建品牌按钮
+			public function OnGetBrands():void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("GetBrands");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnGetBrandsFault);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnGetBrandsResult);
+				
+				op.send("","0");	
+			}
+			
+			public function OnGetBrandsResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnGetBrandsFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnGetBrandsResult);				
+				
+				try
+				{
+					var jsonStr:String = e.result.toString();
+					var jsonObj:Object = com.adobe.serialization.json.JSON.decode(jsonStr); 
+					
+					if("1" == jsonObj.success)
+					{
+						var left:int = mLabelBrand.left.valueOf() + mLabelBrand.width;
+						var top:int  = mLabelBrand.top.valueOf() + m_btnTopSpace;
+						
+						var leftPos:int = left;
+						var topPos:int  = top;
+						
+						for(var iIndex:int = 0; iIndex < jsonObj.data.length;++iIndex)				
+						{
+							var btn:RadioButton = new RadioButton();
+							btn.setStyle("skinClass",Skins.ListItemButton);
+							
+							//按钮显示文本
+							var brand:Object = jsonObj.data[iIndex];
+							btn.label = brand.name;
+							
+							btn.groupName = "brand";
+							btn.alpha = 1;
+							
+							var byteButtonText:ByteArray = new ByteArray();  
+							byteButtonText.writeMultiByte(btn.label,"gbk");  
+							
+							var btnWidth:int = byteButtonText.length * m_btnFontWidth; 
+							
+							byteButtonText = null;
+							
+							if( (leftPos + btnWidth) > (this.width - left) )
+							{
+								leftPos = left;
+								topPos += m_btnHeight + 5;
+							}
+							
+							btn.left   = leftPos;
+							btn.top    = topPos;
+							btn.width  = btnWidth;
+							btn.height = m_btnHeight;
+							
+							btn.addEventListener(MouseEvent.CLICK,OnButtonClick); 
+							this.addElement(btn); 
+							
+							leftPos += btnWidth + m_btnSpace;
+						}
+						
+						this.height = topPos + m_btnHeight + 60;
+					}
+					else
+					{
+						m_iHouse.mHelpDialog.show(jsonObj.nofityMsg);
+					}
+				} 
+				catch(error:Error) 
+				{
+					m_iHouse.mHelpDialog.show(error.message);
+				}
+			}
+			
+			private function OnGetBrandsFault(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnGetBrandsFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnGetBrandsResult);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试");
+			}
+			
+		]]>
+	</fx:Script>
+	
+
+	<s:Rect left="0" top="0" bottom="0" right="0" alpha="1"  >
+		<s:fill>
+			<s:SolidColor color="#f5f5f5"/>
+		</s:fill>
+		<s:stroke>
+			<s:SolidColorStroke caps="none" color="#000000" joints="miter" miterLimit="4" weight="1"/>
+		</s:stroke>			
+	</s:Rect>
+	
+	<s:Label id="mLabelColor" left="9" top="5"  text="颜色" fontFamily="宋体" fontSize="18" />
+	<s:Label id="mLabelStyle" left="9" top="35" text="风格" fontFamily="宋体" fontSize="18" />
+	<s:Label id="mLabelBrand" left="9" top="65" text="品牌" fontFamily="宋体" fontSize="18"  />
+</s:ItemRenderer>
