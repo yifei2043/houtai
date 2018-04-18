@@ -31,6 +31,8 @@
 			public var m_btnLineCount:Number = 5;  //每行5个按钮
 			public var m_btnFontWidth:Number = 10; //一个字字占用宽度 
 			
+			public var type:String = "";
+			
 //			public var mWebService:WebService = null;
 			
 			public function OnInit():void
@@ -122,11 +124,11 @@
 			//创建品牌按钮
 			public function OnGetBrands():void
 			{
-				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("GetBrands");
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("GetBrandsByClass");
 				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnGetBrandsFault);
 				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnGetBrandsResult);
 				
-				op.send("","0");	
+				op.send(type);	
 			}
 			
 			public function OnGetBrandsResult(e:ResultEvent):void

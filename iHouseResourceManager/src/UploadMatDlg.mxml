@@ -300,6 +300,9 @@
 						                   );	
 					}
 				}  		
+				var factory:ClassFactory = new ClassFactory(Skins.ListItemRender);
+				factory.properties={type:strRecordArray[1]};
+				mList.itemRenderer = factory;
 			} 	
 			
 			private function CheckValue():Boolean
@@ -1158,7 +1161,7 @@
 			<s:TextArea id="mTextAttribute" left="1" top="1" right="5" bottom="160" fontFamily="宋体" fontSize="14" restrict="^,#~" tabIndex="8"/>
 			<s:List id="mList" left="5" top="115" right="5"  bottom="40"  borderVisible="false"
 					contentBackgroundColor="#F7F7F7"  
-					itemRenderer="Skins.ListItemRender" verticalScrollPolicy="on" horizontalScrollPolicy="off">		
+					verticalScrollPolicy="on" horizontalScrollPolicy="off">		
 			</s:List>
 			<s:Label id="mLabelAttribute" left="1" bottom="4" right="20" color="#ff0000"  fontFamily="宋体" fontSize="14"
 					 text="说明：输入属性内容，例如一个瓷砖有品牌、颜色、规格、尺寸,则输入以下内容：马可波罗白色花纹200X300,这里可以根据贴图信息输入任意与贴图相关信息，主要目的方便前端查找。"/>
