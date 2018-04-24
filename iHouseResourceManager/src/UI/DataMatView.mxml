@@ -20,6 +20,8 @@
 			import mx.rpc.events.FaultEvent;
 			import mx.rpc.events.ResultEvent;
 			import mx.utils.UIDUtil;
+			import mx.controls.treeClasses.TreeItemRenderer;
+			import mx.core.UITextField;
 			
 			public  var m_iHouse:iHouseResourceManager;
 			public  var ImageGroup:ArrayCollection   =new ArrayCollection();
@@ -53,9 +55,22 @@
 				menuTree.variableRowHeight = true; 
 				menuTree.addEventListener(MenuEvent.ITEM_CLICK, tree_MenuItemSelected);  //右键菜单的事件
 				mFurniture.addEventListener(MouseEvent.RIGHT_CLICK,treeRightClick);
+				mFurniture.addEventListener(MouseEvent.RIGHT_MOUSE_DOWN,rightClick);
 				mFurniture.addEventListener(MouseEvent.CLICK,treeClick);			
 				
 			}
+			
+			private function rightClick(evt:MouseEvent):void
+			{
+				if(evt.target!=null&&evt.target is UITextField && UITextField(evt.target).owner!=null)
+				{
+					mFurniture.selectedItem= TreeItemRenderer(UITextField(evt.target).owner).data;
+				}
+				else
+				{
+					mFurniture.selectedItem = null;
+				}
+			}  
 			
 //			//xml读取成功后调用此函数,创建按钮
 //			public function InitQueryDialog():void
@@ -92,6 +107,10 @@
 				var menuDel:Object=new Object();
 				menuDel.label="删除分类";
 				menuItems.push(menuDel);
+				
+				var menuBrands:Object=new Object();
+				menuBrands.label="编辑品牌";
+				menuItems.push(menuBrands);
 				
 /* 				var menuModify:Object=new Object();
 				menuModify.label="修改分类";
@@ -143,6 +162,18 @@
 				}
 				
 				mModifyClassDlg.ModifyTextureClass(strClass1,strClass2,selNodeName);
+			}
+			public function onBrandsNode():void
+			{
+				if( mFurniture.selectedItem == null )
+					return;
+				
+				treeNode =XML(mFurniture.selectedItem);
+				var nodeTemp:XML=XML(mFurniture.selectedItem);
+				var selNodeName:String = treeNode.@Name;
+				
+				m_iHouse.mChangeBrandsDlg.OnGetBrands(selNodeName);
+				m_iHouse.mChangeBrandsDlg.visible = true;
 			}
 			
 			//修改分类 
@@ -218,7 +249,13 @@
 						
 						OnModifyNode();
 					}
-						break;						
+						break;		
+					
+					case "编辑品牌":
+					{
+						onBrandsNode();
+					}
+						break;
 				}
 			}			
 			

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009"
+				xmlns:s="library://ns.adobe.com/flex/spark"
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				width="670" height="70" creationComplete="OnInit();" >
+	<fx:Script>
+		<![CDATA[
+						
+			public function OnInit():void
+			{		
+
+			}		
+			
+			public function OnDelete():void
+			{
+				data.gParent.OnDelBrands(data.type,data.name);
+			}	
+			
+			public function OnEdit():void
+			{
+				mText1.visible = false;
+				mText2.visible = true;
+				mText2.setFocus();
+			}	
+			
+			public function OnUpdate():void
+			{
+				if(""!=mText2.text && data.name!=mText2.text){
+					data.gParent.OnEditBrands(data.type,data.name,mText2.text);
+					data.name = mText2.text;
+					mText1.text = mText2.text;
+				}
+				mText1.visible = true;
+				mText2.visible = false;
+			}
+			
+//			private function OnDeleteBrands_YES():void
+//			{
+//				data.gParent.OnDelBrands(data.type,data.name);
+//			}
+//			private function OnDeleteBrands_NO():void
+//			{
+//				
+//			}
+
+		]]>		
+	</fx:Script>			
+	<s:layout>
+		<s:BasicLayout/>
+	</s:layout>	
+	<s:Rect left="0" right="0" bottom="1" height="0.5" >
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>		
+	<s:Label id="mText1" x="27" y="25" text="{data.name}" width="295" fontFamily="宋体" fontSize="14"/>
+	<s:TextInput id="mText2" x="25" y="23" text="{data.name}" width="200" fontFamily="宋体" fontSize="14" visible="false" focusOut="OnUpdate()"/>
+	<s:Button id="mEdit" x="547" y="22" width="48" label="修改" fontFamily="宋体" click="OnEdit()" skinClass="Skins.CommonButton"/>
+	<s:Button id="mDelete" x="607" y="22" width="48" label="删除" fontFamily="宋体" click="OnDelete()" skinClass="Skins.CommonButton"/>
+</s:ItemRenderer>

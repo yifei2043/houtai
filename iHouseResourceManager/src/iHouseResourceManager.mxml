@@ -136,6 +136,7 @@
 	<local:ChangeModelClassDlg   id="mChangeModelClassDlg" m_iHouse="{this}" horizontalCenter="0" verticalCenter="0"   visible="false"/>
 	<local:ChangeMaterialClassDlg   id="mChangeMaterialClassDlg" m_iHouse="{this}" horizontalCenter="0" verticalCenter="0"   visible="false"/>
     <local:UploadModelDlg id="mUploadFileDlg" m_iHouse="{this}" x="{(this.width-mUploadFileDlg.width)/2}" y="{(this.height-mUploadFileDlg.height)/2-48}" visible="false"  />
+	<local:ChangeBrandsDlg id="mChangeBrandsDlg" m_iHouse="{this}" x="{(this.width-mUploadFileDlg.width)/2}" y="{(this.height-mUploadFileDlg.height)/2-48}" visible="false"  />
 	
 	<UI:ResourceHelpDialog 	id="mHelpDialog"   m_iHouse="{this}" x="{(this.width-mHelpDialog.width)/2}" y="{(this.height-mHelpDialog.height)/2}" visible="false"  />
 	<UI:ResourceAlertDialog id="mAlertDialog"   m_iHouse="{this}" x="{(this.width-mAlertDialog.width)/2}" y="{(this.height-mAlertDialog.height)/2}" visible="false"  />

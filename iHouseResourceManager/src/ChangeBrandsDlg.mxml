@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="750" height="500" creationComplete="init()">
+	
+	<fx:Script>
+		<![CDATA[	
+			import Skins.BudgetRenderer;
+			
+			import UI.ResourceAlertDialog;
+			
+			import com.adobe.serialization.json.*;
+			
+			import flash.display3D.IndexBuffer3D;
+			import flash.net.navigateToURL;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.Form;
+			import mx.controls.Alert;
+			import mx.controls.ProgressBar;
+			import mx.core.UIComponent;
+			import mx.events.CollectionEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ItemClickEvent;
+			import mx.events.ListEvent;
+			import mx.rpc.AbstractOperation;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.InvokeEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.utils.UIDUtil;
+			
+			import spark.events.IndexChangeEvent;
+			import spark.events.TextOperationEvent;
+			
+			private var m_strType:String;
+			private var BrandsGroup:ArrayCollection  		= new ArrayCollection();
+			public  var m_iHouse:iHouseResourceManager;
+			
+			private function init():void
+			{
+ 
+				
+			}
+			
+			public function InitDialog():void
+			{
+
+			}
+						
+			public function OnGetBrands(type:String):void
+			{
+				m_strType = type;
+				mTitle.text = "编辑品牌--" + type;
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("GetBrandsByClass");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnGetBrandsFault);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnGetBrandsResult);
+				
+				op.send(type);	
+			}
+			
+			public function OnGetBrandsResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnGetBrandsFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnGetBrandsResult);				
+				
+				try
+				{
+					var jsonStr:String = e.result.toString();
+					var jsonObj:Object = com.adobe.serialization.json.JSON.decode(jsonStr); 
+					BrandsGroup.removeAll();
+					
+					if("1" == jsonObj.success)
+					{
+					    
+						for(var iIndex:int = 0; iIndex < jsonObj.data.length;++iIndex)				
+						{
+							var brand:Object = jsonObj.data[iIndex];
+							BrandsGroup.addItem({
+								type:m_strType,
+								name:brand.name,											
+								gParent:this});
+						}
+						
+					}
+					else
+					{
+						m_iHouse.mHelpDialog.show(jsonObj.nofityMsg);
+					}
+				} 
+				catch(error:Error) 
+				{
+					m_iHouse.mHelpDialog.show(error.message);
+				}
+			}
+			
+			private function OnGetBrandsFault(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnGetBrandsFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnGetBrandsResult);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试");
+			}
+			
+			public function OnDelBrands(type:String,name:String):void
+			{
+				
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("DelBrandsByClass");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnDelBrandsFault);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnDelBrandsResult);
+				
+				op.send(type,name);	
+			}
+			
+			public function OnDelBrandsResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnDelBrandsFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnDelBrandsResult);				
+				OnGetBrands(m_strType);
+			}
+			
+			private function OnDelBrandsFault(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnDelBrandsFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnDelBrandsResult);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试");
+			}
+			
+			public function OnEditBrands(type:String,name_old:String,name_new:String):void
+			{
+				
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("EditBrandsByClass");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnEditBrandsFault);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnEditBrandsResult);
+				
+				op.send(type,name_old,name_new);	
+			}
+			
+			public function OnEditBrandsResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnEditBrandsFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnEditBrandsResult);				
+				OnGetBrands(m_strType);
+			}
+			
+			private function OnEditBrandsFault(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnEditBrandsFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnEditBrandsResult);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试");
+			}
+			
+			public function OnAddBrands():void
+			{
+				
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("AddBrandsByClass");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnAddBrandsFault);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnAddBrandsResult);
+				
+				op.send(m_strType,mText0.text);	
+			}
+			
+			public function OnAddBrandsResult(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnAddBrandsFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnAddBrandsResult);				
+				OnGetBrands(m_strType);
+				mText0.text = "";
+			}
+			
+			private function OnAddBrandsFault(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnAddBrandsFault);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnAddBrandsResult);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试");
+			}
+			
+			public function OnClose():void
+			{
+				this.visible = false;
+			}
+			
+			
+		]]>
+	</fx:Script>	
+	<fx:Declarations>
+		<mx:Blur id="blurOn" blurXFrom="0.0" blurXTo="10.0" blurYFrom="0.0" blurYTo="10.0"/>
+		<mx:Blur id="blurOut" blurXFrom="10.0" blurXTo="0.0" blurYFrom="10.0" blurYTo="0.0"/>	
+	</fx:Declarations>
+	<fx:Style>
+		Tree {
+		textAlign: left;
+		fontWeight: normal;
+		}
+	</fx:Style>	
+	<s:Rect x="-1000" y="-1000" width="5000" height="5000" alpha="0.5">
+		<s:fill>
+			<s:SolidColor color="#787878"/>
+		</s:fill>
+	</s:Rect>
+		
+	<s:Group left="0" right="0" top="0" bottom="0" >
+		<s:Group left="10" right="35" top="20" height="45" mouseDown="this.startDrag();" mouseUp="this.stopDrag()"/>	
+		<s:Rect right="20" top="20" left="10" bottom="8" radiusX="5">
+			<s:fill>
+				<s:SolidColor color="#ffffff"/>
+			</s:fill>		
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="8" blurY="8" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 		
+		</s:Rect>	
+		
+		<s:Rect right="0" top="0" width="35" height="35" radiusX="45">
+			<s:stroke>
+				<s:SolidColorStroke color="#ffffff" caps="none" weight="3" joints="miter" miterLimit="4"/>
+			</s:stroke>	
+			<s:fill>
+				<s:SolidColor color="#000000"/>
+			</s:fill>
+			<s:filters>
+				<s:DropShadowFilter angle="0" blurX="4" blurY="4" color="#888888"
+									distance="0" hideObject="false" inner="false" knockout="false"
+									quality="2" strength="1"/>
+			</s:filters> 	
+		</s:Rect>
+		<s:Label id="mTitle" left="20"  top="40"  fontFamily="宋体"  fontSize="36" text="编辑品牌"/>
+		<s:Rect right="33"  left="22" top="80">
+			<s:stroke>
+				<s:SolidColorStroke color="#dddddd" caps="none" weight="2" joints="miter" miterLimit="1"/>
+			</s:stroke>			
+		</s:Rect>
+		<s:List id="mListBrands" dataProvider="{BrandsGroup}" itemRenderer="Skins.Brands" 
+				click="" left="25" top="90" right="35"  bottom="134" verticalScrollPolicy="on" />	
+		<s:TextInput id="mText0" left="25" bottom="100" text="" width="200" fontFamily="宋体" fontSize="14" />
+		<s:Button id="mAdd" left="230" bottom="102" width="48" label="添加" fontFamily="宋体" click="OnAddBrands()" skinClass="Skins.CommonButton"/>
+		<s:Image right="8" top="10"  source="@Embed('/assets/close.png')" 
+				 mouseDownEffect="{blurOn}" mouseUpEffect="{blurOut}"
+				 buttonMode="true" click="OnClose();" />		
+
+	</s:Group>	
+</s:Group>

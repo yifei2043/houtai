@@ -119,6 +119,10 @@
 				menuDel.label="删除分类";
 				menuItems.push(menuDel);
 				
+				var menuBrands:Object=new Object();
+				menuBrands.label="编辑品牌";
+				menuItems.push(menuBrands);
+				
 /* 				var menuModify:Object=new Object();
 				menuModify.label="修改分类";
 				menuItems.push(menuModify); */
@@ -174,6 +178,12 @@
 						OnModifyNode();
 					}
 						break;					
+					
+					case "编辑品牌":
+					{
+						onBrandsNode();
+					}
+						break;
 				}
 			}			
 			
@@ -285,6 +295,20 @@
 				}
 				
 				mModifyClassDlg.ModifyModelClass(strClass1,strClass2,strClass3,selNodeName);
+			}
+			
+			public function onBrandsNode():void
+			{
+				if( mFurniture.selectedItem == null )
+					return;
+				
+				treeNode=XML(mFurniture.selectedItem);
+				var nodeTemp:XML=XML(mFurniture.selectedItem);
+				var selNodeName:String = treeNode.@Name;
+				
+				m_iHouse.mChangeBrandsDlg.OnGetBrands(selNodeName);
+				m_iHouse.mChangeBrandsDlg.visible = true;
+				
 			}
 			
 			//修改分类 
