@@ -512,6 +512,7 @@
 			private var m_strClass1:String;
 			private var m_strClass2:String;
 			private var m_iJCS:int = 0;		//建材商选择
+			private var m_iCmp:int = 0;		//公司选择
 			public function DoSql(str1:String,str2:String):void
 			{
 				m_strClass1 = str1;
@@ -532,6 +533,9 @@
 				if(m_iJCS>0){
 					strSql += " and UserJcsID = '" + m_iJCS + "'";
 				}
+				if(m_iCmp>0){
+					strSql += " and companyID = '" + m_iCmp + "'";
+				}
 				
 				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("DoSql");
 				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnErrorSql);
@@ -542,6 +546,11 @@
 			public function OnChangeRecord(list:ArrayCollection, key:String):void
 			{
 				m_iJCS = list[mJCS.selectedIndex][key];
+			}
+			
+			public function OnChangeCompany(list:ArrayCollection, key:String):void
+			{
+				m_iCmp = list[mCmp.selectedIndex][key];
 			}
 			
 			private function OnErrorSql(e:FaultEvent):void
@@ -932,7 +941,10 @@
 		<s:DropDownList id="mJCS" x="280" y="10" width="110" height="23" labelField="lable" color="#000000"
 						change="OnChangeRecord(mUploadFileDlg.RecordGroup, 'id')" dataProvider="{mUploadFileDlg.RecordGroup}" fontFamily="宋体"
 						fontSize="15" tabIndex="7"/>
-		<s:Button id="Sel" x="400" y="0" width="80" label="筛选" buttonMode="true"
+		<s:DropDownList id="mCmp" x="400" y="10" width="140" height="23" labelField="lable" color="#000000"
+						change="OnChangeCompany(mUploadFileDlg.CompanyGroup, 'id')" dataProvider="{mUploadFileDlg.CompanyGroup}" fontFamily="宋体"
+						fontSize="15" tabIndex="8"/>
+		<s:Button id="Sel" x="550" y="0" width="80" label="筛选" buttonMode="true"
 				  click="DoSqlKey(SelKey.text);" skinClass="Skins.NormalCreateBtnSkin"/>	
 	</s:Group>
 	

@@ -43,6 +43,7 @@
 			private var m_iType:int = 0;		//反射类型 普通：0  高光：1  平光：2  哑光：3
 			private var m_iPutType:int = 0;    //放置类型 通用:0  地面：1  墙面：2  顶面：3
 			private var m_iJCS:int = 0;		//建材商选择
+			private var m_iCmp:int = 0;		//公司选择
 			
 			private var m_iMode:int = 0; 		// 0 3D   1 vrscene  2 缩略图
 			private var m_strUUID:String;
@@ -53,6 +54,7 @@
 						
 			[Bindable]
 			public var RecordGroup:ArrayCollection   =new ArrayCollection();
+			public var CompanyGroup:ArrayCollection   =new ArrayCollection();
 			
 			private function init():void
 			{
@@ -70,6 +72,8 @@
 				m_iType = 0;
 				mJCS.selectedIndex = 0;
 				m_iJCS = 0;
+				mCmp.selectedIndex = 0;
+				m_iCmp = 0;
 				
 				//放置类型 通用:0  地面：1  墙面：2  顶面：3
 				PutTypeGroup.addItem({label:"通用"});
@@ -212,6 +216,16 @@
 					{
 						m_iJCS = RecordGroup[i]['id'];
 						mJCS.selectedIndex = i;
+						break;
+					}
+				}
+				mCmp.selectedIndex = 0;
+				for (var i:int=0; i < CompanyGroup.length; i++)
+				{
+					if (CompanyGroup[i]['id'] == int(strRecordArray[11]))
+					{
+						m_iCmp = CompanyGroup[i]['id'];
+						mCmp.selectedIndex = i;
 						break;
 					}
 				}
@@ -760,7 +774,7 @@
 					m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnModifyModelResult);
 					m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnModifyModelFault);	
 					op.send(m_strName,m_strSize,arrayClass[0],arrayClass[1],m_iType,Number(mPrice.text), 
-						    m_strUUID,mTextAttribute.text,mMaterialName.text,m_iPutType,strNewUUID,m_iJCS);
+						    m_strUUID,mTextAttribute.text,mMaterialName.text,m_iPutType,strNewUUID,m_iJCS,m_iCmp);
 				}
 				else
 				{
@@ -801,6 +815,11 @@
 			public function OnChangeRecord(list:ArrayCollection, key:String):void
 			{
 				m_iJCS = list[mJCS.selectedIndex][key];
+			}
+			
+			public function OnChangeCompany(list:ArrayCollection, key:String):void
+			{
+				m_iCmp = list[mCmp.selectedIndex][key];
 			}
 			
 			
@@ -1067,6 +1086,51 @@
 						lable:strRecordArray[0]
 					});
 				}
+				GetCompanyList();
+			}
+			
+			/***
+			 * 得到公司列表
+			 * 
+			 */
+			public function GetCompanyList():void
+			{
+				var op:AbstractOperation = m_iHouse.mDataProcess.mWebService1.getOperation("GetCompanyList");
+				m_iHouse.mDataProcess.mWebService1.addEventListener(FaultEvent.FAULT, OnErrorCompany);
+				m_iHouse.mDataProcess.mWebService1.addEventListener(ResultEvent.RESULT,OnResultCompany);
+				op.send(m_iHouse.mStrAccountType, m_iHouse.mStrCompanyID); 
+			}
+			
+			private function OnErrorCompany(e:FaultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,OnErrorCompany);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResultCompany);
+				m_iHouse.mHelpDialog.show("系统繁忙,请重试.");	 
+			}			
+			
+			public function OnResultCompany(e:ResultEvent):void
+			{
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(FaultEvent.FAULT,  OnErrorCompany);
+				m_iHouse.mDataProcess.mWebService1.removeEventListener(ResultEvent.RESULT,OnResultCompany);
+				
+				CompanyGroup.addItem({id:"-1", lable:"不限"});
+				
+				var str:String = e.result.toString();
+				var strArray:Array = str.split("#");
+				
+				for( var i:int = 0;i<strArray.length; i++ )  
+				{
+					var strRecord:String = strArray[i];
+					var strRecordArray:Array = strRecord.split("~");
+					
+					if( strRecordArray.length < 2 )
+						continue;
+					
+					CompanyGroup.addItem({id:strRecordArray[0], 
+						lable:strRecordArray[1]
+					});
+				}
+				m_iHouse.mUploadFileDlg.GetJcsUserList();
 			}
 			
 		]]>
@@ -1182,10 +1246,13 @@
 		<s:DropDownList id="mJCS" x="123" bottom="65" width="111" height="23" labelField="lable"
 						change="OnChangeRecord(RecordGroup, 'id')" dataProvider="{RecordGroup}" fontFamily="宋体"
 						fontSize="15" tabIndex="7"/>
+		<s:DropDownList id="mCmp" x="244" bottom="65" width="140" height="23" labelField="lable"
+						change="OnChangeCompany(CompanyGroup, 'id')" dataProvider="{CompanyGroup}" fontFamily="宋体"
+						fontSize="15" tabIndex="8"/>
 		
-		<s:Label id="mPriceText" x="255" bottom="69" fontFamily="宋体" fontSize="14" text="价 格:" visible="true"/>
-		<s:Label id="mPriceUnit" x="414" bottom="69" fontFamily="宋体" fontSize="14" text="元" visible="true"/>
-		<s:TextInput id="mPrice" x="306" bottom="65" width="100" fontFamily="宋体" fontSize="15"
+		<s:Label id="mPriceText" x="405" bottom="69" fontFamily="宋体" fontSize="14" text="价 格:" visible="true"/>
+		<s:Label id="mPriceUnit" x="564" bottom="69" fontFamily="宋体" fontSize="14" text="元" visible="true"/>
+		<s:TextInput id="mPrice" x="456" bottom="65" width="100" fontFamily="宋体" fontSize="15"
 					 restrict="0-9." visible="true"/>
 		
 		<s:Button x="315" y="534" width="120" height="26" label="确定" skinClass="Skins.CommonButton" click="OnOK();"/>
