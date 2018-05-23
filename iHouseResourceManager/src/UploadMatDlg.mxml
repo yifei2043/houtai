@@ -204,6 +204,7 @@
 				mLength.text = sizArray[0]; 
 				mWidth.text  = sizArray[1];
 				mPrice.text  = strRecordArray[9];
+				mMallID.text  = strRecordArray[17];
 				
 				mType.selectedIndex = int(strRecordArray[5]); 	// 类型
 				m_iType = int(strRecordArray[5]);
@@ -774,7 +775,7 @@
 					m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnModifyModelResult);
 					m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnModifyModelFault);	
 					op.send(m_strName,m_strSize,arrayClass[0],arrayClass[1],m_iType,Number(mPrice.text), 
-						    m_strUUID,mTextAttribute.text,mMaterialName.text,m_iPutType,strNewUUID,m_iJCS,m_iCmp);
+						    m_strUUID,mTextAttribute.text,mMaterialName.text,m_iPutType,strNewUUID,m_iJCS,m_iCmp,Number(mMallID.text));
 				}
 				else
 				{
@@ -1205,7 +1206,7 @@
 				 mouseDownEffect="{blurOn}" mouseUpEffect="{blurOut}"
 				 buttonMode="true" click="OnClose();" />		
 
-		<s:Button x="580" bottom="65" width="110" height="23" id="selectFileButton" label="上传本地文件" fontFamily="宋体" 
+		<s:Button x="580" bottom="20" width="110" height="23" id="selectFileButton" label="上传本地文件" fontFamily="宋体" 
 				  click="selectFile()" skinClass="Skins.CommonButton" />
 		<s:Label x="451" y="104" fontFamily="宋体" fontSize="14" text="长:"/>
 		<s:Label x="533" y="104" fontFamily="宋体" fontSize="14" text="宽:"/>
@@ -1251,8 +1252,12 @@
 						fontSize="15" tabIndex="8"/>
 		
 		<s:Label id="mPriceText" x="405" bottom="69" fontFamily="宋体" fontSize="14" text="价 格:" visible="true"/>
-		<s:Label id="mPriceUnit" x="564" bottom="69" fontFamily="宋体" fontSize="14" text="元" visible="true"/>
-		<s:TextInput id="mPrice" x="456" bottom="65" width="100" fontFamily="宋体" fontSize="15"
+		<s:Label id="mPriceUnit" x="524" bottom="69" fontFamily="宋体" fontSize="14" text="元" visible="true"/>
+		<s:TextInput id="mPrice" x="456" bottom="65" width="60" fontFamily="宋体" fontSize="15"
+					 restrict="0-9." visible="true"/>
+		
+		<s:Label id="mMallIDText" x="554" bottom="69" fontFamily="宋体" fontSize="14" text="商城ID：" visible="true"/>
+		<s:TextInput id="mMallID" x="606" bottom="65" width="60" fontFamily="宋体" fontSize="15"
 					 restrict="0-9." visible="true"/>
 		
 		<s:Button x="315" y="534" width="120" height="26" label="确定" skinClass="Skins.CommonButton" click="OnOK();"/>

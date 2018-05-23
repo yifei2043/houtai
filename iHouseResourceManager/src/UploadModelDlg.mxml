@@ -190,6 +190,7 @@
 				mWidth.text  = sizArray[1];
 				mHeight.text = sizArray[2];
 				mPrice.text  = strRecordArray[10];
+				mMallID.text  = strRecordArray[18];
 				mType.selectedIndex = int(strRecordArray[6]); 	// 类型
 				m_iType = int(strRecordArray[6]);
 				
@@ -1232,7 +1233,7 @@
 					m_iHouse.mDataProcess.mWebService2.addEventListener(ResultEvent.RESULT,OnModifyModelResult);
 					m_iHouse.mDataProcess.mWebService2.addEventListener(FaultEvent.FAULT,OnModifyModelFault);	
 					op.send(m_strName,m_strSize,arrayClass[0],arrayClass[1],arrayClass[2],
-						    m_iType,Number(mPrice.text), m_strUUID,mTextAttribute.text,mModelName.text,strNewUUID,m_iJCS,m_iCmp);
+						    m_iType,Number(mPrice.text), m_strUUID,mTextAttribute.text,mModelName.text,strNewUUID,m_iJCS,m_iCmp,Number(mMallID.text));
 					
 					OnClearData();
 				}
@@ -1755,8 +1756,12 @@
 						fontSize="15" tabIndex="8"/>
 		
 		<s:Label id="mPriceText" x="405" y="542" fontFamily="宋体" fontSize="14" text="价 格:" visible="true"/>
-		<s:Label id="mPriceUnit" x="564" y="542" fontFamily="宋体" fontSize="14" text="元" visible="true"/>
-		<s:TextInput id="mPrice" x="456" y="538" width="100" fontFamily="宋体" fontSize="15"
+		<s:Label id="mPriceUnit" x="524" y="542" fontFamily="宋体" fontSize="14" text="元" visible="true"/>
+		<s:TextInput id="mPrice" x="456" y="538" width="60" fontFamily="宋体" fontSize="15"
+					 restrict="0-9." visible="true"/>
+		
+		<s:Label id="mMallIDText" x="554" y="542" fontFamily="宋体" fontSize="14" text="商城ID：" visible="true"/>
+		<s:TextInput id="mMallID" x="606" y="538" width="60" fontFamily="宋体" fontSize="15"
 					 restrict="0-9." visible="true"/>
 		
 		<s:Button x="307" y="578" width="120" height="26" label="确定" skinClass="Skins.CommonButton" click="OnOK();"/>
